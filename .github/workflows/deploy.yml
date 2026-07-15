@@ -1,4 +1,4 @@
-name: Deploy to Cloudflare Pages
+name: Deploy to Cloudflare
 
 on:
   push:
@@ -25,11 +25,12 @@ jobs:
             --exclude='dist' \
             --exclude='README.md' \
             --exclude='DEPLOYMENT.md' \
+            --exclude='wrangler.toml' \
             ./ dist/
 
-      - name: Deploy to Cloudflare Pages
+      - name: Deploy to Cloudflare Worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=${{ secrets.CLOUDFLARE_PROJECT_NAME }}
+          command: deploy

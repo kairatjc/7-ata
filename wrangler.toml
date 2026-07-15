@@ -1,0 +1,17 @@
+# Wrangler configuration for the "sample" Worker (static assets only).
+# Used by the GitHub Actions workflow in .github/workflows/deploy.yml.
+
+name = "sample"
+compatibility_date = "2026-07-15"
+
+# Matches the current dashboard setting (workers.dev is disabled).
+workers_dev = false
+
+# The site files are collected into ./dist by the workflow before deploying.
+[assets]
+directory = "./dist"
+
+# Keeps the custom domain attached across deploys.
+[[routes]]
+pattern = "kairat.me"
+custom_domain = true
