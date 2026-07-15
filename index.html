@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ky">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Ногой санжырасы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="stage">
+  <svg id="tree" aria-label="Ногой санжырасынын дарагы"></svg>
+</div>
+
+<header>
+  <div class="brand">
+    <svg class="horns" viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" aria-hidden="true">
+      <path d="M60 100 C60 62 26 64 26 40 C26 22 50 22 50 40 C50 52 36 52 36 42"/>
+      <path d="M60 100 C60 62 94 64 94 40 C94 22 70 22 70 40 C70 52 84 52 84 42"/>
+      <path d="M60 100 L60 112"/>
+    </svg>
+    <div>
+      <h1>Ногой санжырасы</h1>
+      <p class="sub">Эркек тукум боюнча ата-теги</p>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+
+  <div class="search">
+    <input id="q" type="search" placeholder="Ат боюнча издөө" autocomplete="off" aria-label="Ат боюнча издөө">
+    <span class="count" id="qcount"></span>
+  </div>
+
+  <div class="chips">
+    <button class="chip on" data-branch="all">Баары</button>
+    <button class="chip" data-branch="karach">Карач</button>
+    <button class="chip" data-branch="manas">Манас</button>
+  </div>
+
+  <div class="zoom">
+    <button id="zin"  title="Чоңойтуу" aria-label="Чоңойтуу">＋</button>
+    <button id="zout" title="Кичирейтүү" aria-label="Кичирейтүү">－</button>
+    <button id="zfit" title="Толук көрүнүш" aria-label="Толук көрүнүш">⤢</button>
+  </div>
+</header>
+
+<aside id="panel" aria-live="polite">
+  <button class="close" id="pclose" aria-label="Жабуу">×</button>
+  <p class="gen" id="pgen"></p>
+  <ul class="kin" id="pkin"></ul>
+  <p class="blk-title">Ата-теги</p>
+  <ul class="path" id="ppath"></ul>
+  <p class="blk-title">Сандар</p>
+  <div class="stats">
+    <div class="stat"><b id="pkids">0</b><span>уул тукуму</span></div>
+    <div class="stat"><b id="pall">0</b><span>бардык урпагы</span></div>
+  </div>
+</aside>
+
+<p class="legend">
+  <b>Кутуча</b> — бир туугандар &nbsp;·&nbsp; <b>Жебе</b> — атадан балага<br>
+  Сүйрөп жылдырыңыз · дөңгөлөк менен чоңойтуңуз · басып тааныңыз
+</p>
+
+<svg class="corner bl" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true">
+  <path d="M8 92 C8 50 40 56 40 30 C40 12 62 14 62 30 C62 42 48 42 48 32"/>
+  <path d="M8 92 L92 92 M8 92 L8 8"/>
+</svg>
+<svg class="corner br" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true">
+  <path d="M8 92 C8 50 40 56 40 30 C40 12 62 14 62 30 C62 42 48 42 48 32"/>
+  <path d="M8 92 L92 92 M8 92 L8 8"/>
+</svg>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

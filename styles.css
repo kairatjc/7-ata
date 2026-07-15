@@ -1,0 +1,242 @@
+/* ── Токендер ─────────────────────────────────────────────── */
+:root {
+  --field:      #22302A;   /* кийиз – караңгы жашыл */
+  --field-deep: #1A251F;
+  --tile:       #F1E9D8;   /* ак кийиз */
+  --tile-edge:  #8A3B2E;   /* кызыл сайма */
+  --cord:       #C7A344;   /* жип – саргыч */
+  --accent:     #B4392E;   /* шырдак кызыл */
+  --ink:        #221F1A;
+  --muted:      #93A398;
+  --tile-w: 152px;
+
+  --display: "Unbounded", "Trebuchet MS", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; height: 100%;
+  background: var(--field-deep);
+  color: var(--tile);
+  font-family: var(--body);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Талаа (canvas) ──────────────────────────────────────── */
+#stage {
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #2B3A33 0%, var(--field) 45%, var(--field-deep) 100%);
+  cursor: grab;
+  touch-action: none;
+}
+#stage.dragging { cursor: grabbing; }
+
+/* кочкор мүйүз – фон оймосу */
+#stage::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'>\
+<g fill='none' stroke='%23F1E9D8' stroke-width='1.6' stroke-linecap='round'>\
+<path d='M60 96 C60 60 26 62 26 40 C26 24 48 24 48 40 C48 50 36 50 36 41'/>\
+<path d='M60 96 C60 60 94 62 94 40 C94 24 72 24 72 40 C72 50 84 50 84 41'/>\
+<path d='M60 96 L60 108'/></g></svg>");
+  background-size: 150px 150px;
+  opacity: 0.045;
+}
+
+svg#tree { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* ── Байланыш сызыктары ──────────────────────────────────── */
+.link {
+  fill: none;
+  stroke: var(--cord);
+  stroke-width: 1.4;
+  opacity: 0.5;
+  transition: stroke .18s, opacity .18s, stroke-width .18s;
+}
+.link.hot { stroke: var(--accent); opacity: 1; stroke-width: 2.4; }
+.link.dim { opacity: 0.08; }
+
+/* ── Түйүндөр ────────────────────────────────────────────── */
+.node { cursor: pointer; }
+.node .plate {
+  fill: var(--tile);
+  stroke: rgba(138, 59, 46, .55);
+  stroke-width: 1.2;
+  rx: 3;
+  transition: stroke .18s, stroke-width .18s;
+}
+.node .name {
+  fill: var(--ink);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: .01em;
+  dominant-baseline: middle;
+}
+.node:hover .plate,
+.node.hot .plate { stroke: var(--accent); stroke-width: 2.4; }
+.node.hit .plate { fill: #FBE9A8; stroke: var(--cord); stroke-width: 2.6; }
+.node.dim { opacity: .18; }
+.node.sel .plate { stroke: var(--accent); stroke-width: 3; }
+
+/* тамыр – Ногой */
+.node.root .plate { fill: var(--accent); stroke: var(--tile); stroke-width: 1.6; }
+.node.root .name { fill: var(--tile); font-family: var(--display); font-size: 15px; font-weight: 700; letter-spacing: .06em; }
+
+/* эки чоң бутак */
+.node.trunk .plate { fill: #E4D6B4; stroke: var(--tile-edge); stroke-width: 2; }
+.node.trunk .name { font-weight: 700; font-size: 13px; letter-spacing: .04em; }
+
+/* ── Баш калкан ──────────────────────────────────────────── */
+header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 5;
+  display: flex; align-items: center; gap: 18px;
+  padding: 14px 20px;
+  background: linear-gradient(180deg, rgba(26,37,31,.96) 0%, rgba(26,37,31,.82) 70%, rgba(26,37,31,0) 100%);
+  pointer-events: none;
+}
+header > * { pointer-events: auto; }
+
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand .horns { width: 34px; height: 34px; flex: none; opacity: .9; }
+h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 17px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--tile);
+}
+.sub { margin: 2px 0 0; font-size: 11.5px; color: var(--muted); letter-spacing: .02em; }
+
+.spacer { flex: 1; }
+
+/* Издөө */
+.search {
+  position: relative; display: flex; align-items: center;
+}
+.search input {
+  width: 210px;
+  background: rgba(241,233,216,.07);
+  border: 1px solid rgba(241,233,216,.18);
+  border-radius: 2px;
+  color: var(--tile);
+  font-family: var(--body); font-size: 13px;
+  padding: 9px 12px;
+  outline: none;
+  transition: border-color .18s, background .18s;
+}
+.search input::placeholder { color: var(--muted); }
+.search input:focus { border-color: var(--cord); background: rgba(241,233,216,.12); }
+.count {
+  position: absolute; right: 10px;
+  font-size: 11px; color: var(--cord); font-variant-numeric: tabular-nums;
+}
+
+/* Чыпка */
+.chips { display: flex; gap: 6px; }
+.chip {
+  font-family: var(--body); font-size: 12px;
+  padding: 8px 13px; border-radius: 2px;
+  background: transparent;
+  border: 1px solid rgba(241,233,216,.18);
+  color: var(--muted); cursor: pointer;
+  transition: all .18s;
+}
+.chip:hover { color: var(--tile); border-color: rgba(241,233,216,.4); }
+.chip.on { background: var(--tile); color: var(--ink); border-color: var(--tile); font-weight: 600; }
+
+/* Масштаб */
+.zoom { display: flex; gap: 6px; }
+.zoom button {
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  background: rgba(241,233,216,.07);
+  border: 1px solid rgba(241,233,216,.18);
+  border-radius: 2px;
+  color: var(--tile); font-size: 15px; cursor: pointer;
+  transition: all .18s;
+}
+.zoom button:hover { background: var(--tile); color: var(--ink); }
+
+/* ── Маалымат панели ─────────────────────────────────────── */
+#panel {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 320px; z-index: 6;
+  background: #1C2721;
+  border-left: 1px solid rgba(199,163,68,.35);
+  padding: 26px 24px;
+  overflow-y: auto;
+  transform: translateX(102%);
+  transition: transform .3s cubic-bezier(.4,0,.2,1);
+  box-shadow: -20px 0 50px rgba(0,0,0,.35);
+}
+#panel.open { transform: none; }
+#panel .close {
+  position: absolute; top: 16px; right: 16px;
+  background: none; border: 0; color: var(--muted);
+  font-size: 22px; cursor: pointer; line-height: 1;
+}
+#panel .close:hover { color: var(--tile); }
+
+.gen {
+  font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--cord); margin-bottom: 12px;
+}
+.kin { list-style: none; margin: 0 0 26px; padding: 0; }
+.kin li {
+  font-family: var(--display); font-size: 16px; font-weight: 600;
+  color: var(--tile);
+  padding: 7px 0 7px 16px;
+  border-left: 2px solid var(--accent);
+  margin-bottom: 3px;
+}
+.blk-title {
+  font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--muted); margin: 0 0 10px;
+  padding-bottom: 8px; border-bottom: 1px solid rgba(241,233,216,.1);
+}
+.path { list-style: none; margin: 0 0 26px; padding: 0; font-size: 13px; }
+.path li { padding: 5px 0; color: var(--muted); cursor: pointer; }
+.path li:hover { color: var(--cord); }
+.path li::before { content: "↳ "; color: var(--accent); }
+.path li:first-child::before { content: "• "; }
+.stats { display: flex; gap: 26px; }
+.stat b {
+  display: block; font-family: var(--display); font-size: 22px; color: var(--tile);
+  font-variant-numeric: tabular-nums;
+}
+.stat span { font-size: 11px; color: var(--muted); }
+
+/* ── Түшүндүрмө ──────────────────────────────────────────── */
+.legend {
+  position: fixed; left: 20px; bottom: 18px; z-index: 4;
+  font-size: 11.5px; color: var(--muted); line-height: 1.9;
+  pointer-events: none;
+}
+.legend b { color: var(--cord); font-weight: 500; }
+
+.corner {
+  position: fixed; width: 74px; height: 74px; z-index: 3;
+  opacity: .16; pointer-events: none; color: var(--tile);
+}
+.corner.bl { left: 0; bottom: 0; }
+.corner.br { right: 0; bottom: 0; transform: scaleX(-1); }
+
+@media (max-width: 760px) {
+  header { flex-wrap: wrap; gap: 10px; padding: 10px 12px; }
+  .sub, .chips { display: none; }
+  .search input { width: 150px; }
+  h1 { font-size: 13px; letter-spacing: .1em; }
+  #panel { width: 100%; top: auto; height: 62vh; border-left: 0;
+           border-top: 1px solid rgba(199,163,68,.35);
+           transform: translateY(102%); border-radius: 4px 4px 0 0; }
+  #panel.open { transform: none; }
+  .legend, .corner { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
