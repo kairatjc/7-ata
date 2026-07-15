@@ -51,7 +51,7 @@ const SANJYRA = [
               { id: "n39", parent: "n34", name: "Талай" },
                 { id: "n40", parent: "n39", name: "Бакберген" },
                 { id: "n233", parent: "n39", name: "Амир" },
-                { id: "n234", parent: "n39", name: "Эмираты" },
+                { id: "n234", parent: "n39", name: "Эмир" },
                 { id: "n235", parent: "n39", name: "Нурмухаммад" },
               { id: "n41", parent: "n34", name: "Канат" },
             { id: "n42", parent: "n5", name: "Ишенбай" },
