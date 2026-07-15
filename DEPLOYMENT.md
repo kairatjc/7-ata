@@ -1,15 +1,21 @@
-# Automatic Deployment to Cloudflare Pages
+# Automatic Deployment to Cloudflare
 
-This repository is set up to automatically deploy to Cloudflare Pages every time
-something is merged (pushed) to the `main` branch, using the GitHub Actions
-workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
+This repository automatically deploys to the Cloudflare Worker **`sample`**
+(the one serving `kairat.me`) every time something is merged (pushed) to the
+`main` branch, using the GitHub Actions workflow in
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
 
-> **Why GitHub Actions instead of Cloudflare's built-in Git integration?**
-> A Pages project created via manual upload ("Direct Upload") cannot be
-> converted to a Git-connected project in the Cloudflare dashboard. Deploying
-> with Wrangler from GitHub Actions works with your **existing** project, so
-> you keep your current project, custom domain, and settings — nothing needs
-> to be recreated.
+The site is hosted as a **Worker with static assets** (not a Cloudflare Pages
+project), so the workflow runs `wrangler deploy` with the configuration in
+[`wrangler.toml`](wrangler.toml). The worker name, custom domain, and asset
+settings all live in that file:
+
+- `name = "sample"` — must match the worker name in the Cloudflare dashboard
+  (it's the part before `.kairatjc.workers.dev`).
+- `[[routes]]` with `pattern = "kairat.me"` — keeps the custom domain attached
+  across deploys.
+- `[assets] directory = "./dist"` — the workflow collects the site files into
+  `dist/` before deploying.
 
 ## One-time setup
 
@@ -20,73 +26,70 @@ workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
 3. Copy the **Account ID** shown in the right-hand sidebar
    (it's a 32-character hex string).
 
-### Step 2 — Find your Pages project name
-
-1. In the Cloudflare dashboard, go to **Workers & Pages**.
-2. Find the Pages project you currently upload files to manually.
-3. Note its exact **project name** (the name shown in the list, also part of
-   the `*.pages.dev` URL, e.g. `my-site` for `my-site.pages.dev`).
-
-### Step 3 — Create a Cloudflare API token
+### Step 2 — Create a Cloudflare API token
 
 1. In the Cloudflare dashboard, click your profile icon (top right) →
    **My Profile** → **API Tokens** (or go directly to
    <https://dash.cloudflare.com/profile/api-tokens>).
 2. Click **Create Token**.
-3. Choose **Create Custom Token** and configure it:
-   - **Token name:** `github-actions-pages-deploy` (any name works)
-   - **Permissions:** `Account` → `Cloudflare Pages` → `Edit`
-   - **Account Resources:** `Include` → your account
-4. Click **Continue to summary** → **Create Token**.
-5. **Copy the token immediately** — it is shown only once.
+3. Use the **Edit Cloudflare Workers** template — it includes all the
+   permissions Wrangler needs (Workers Scripts edit + Workers Routes edit for
+   the custom domain).
+4. Under **Account Resources**, include your account; under **Zone
+   Resources**, include the `kairat.me` zone (or all zones).
+5. Click **Continue to summary** → **Create Token**.
+6. **Copy the token immediately** — it is shown only once.
 
-### Step 4 — Add the secrets to your GitHub repository
+### Step 3 — Add the secrets to your GitHub repository
 
 1. Open this repository on GitHub → **Settings** → **Secrets and variables** →
    **Actions**.
-2. Click **New repository secret** and create these three secrets:
+2. Click **New repository secret** and create these two secrets:
 
-   | Secret name               | Value                              |
-   |---------------------------|------------------------------------|
-   | `CLOUDFLARE_API_TOKEN`    | The API token from Step 3          |
-   | `CLOUDFLARE_ACCOUNT_ID`   | The Account ID from Step 1         |
-   | `CLOUDFLARE_PROJECT_NAME` | The Pages project name from Step 2 |
+   | Secret name             | Value                      |
+   |-------------------------|----------------------------|
+   | `CLOUDFLARE_API_TOKEN`  | The API token from Step 2  |
+   | `CLOUDFLARE_ACCOUNT_ID` | The Account ID from Step 1 |
 
-### Step 5 — Merge this branch and verify
+### Step 4 — Merge this branch and verify
 
-1. Merge the branch containing the workflow file into `main`.
+1. Merge the pull request containing the workflow into `main`.
 2. Go to the repository's **Actions** tab — a run named
-   **"Deploy to Cloudflare Pages"** should start automatically.
-3. When it finishes green, check your site: the new deployment appears in
-   **Workers & Pages → your project → Deployments**, and your custom domain
-   serves the updated files.
+   **"Deploy to Cloudflare"** should start automatically.
+3. When it finishes green, check **Workers & Pages → sample → Versions** in
+   the Cloudflare dashboard: a new version should appear (deployed via API
+   instead of "Manually deployed"), and <https://kairat.me> should serve the
+   updated files.
 
 ## How it works after setup
 
 - **Every push/merge to `main`** triggers the workflow, which uploads the
   site files (`index.html`, `app.js`, `data.js`, `styles.css`, and anything
-  else you add) to your existing Pages project as a new production deployment.
+  else you add) as the worker's static assets in a new version.
 - **Manual deploys:** you can also trigger a deploy by hand from the
-  **Actions** tab → "Deploy to Cloudflare Pages" → **Run workflow**
-  (the workflow includes a `workflow_dispatch` trigger).
+  **Actions** tab → "Deploy to Cloudflare" → **Run workflow** (the workflow
+  includes a `workflow_dispatch` trigger), or keep using the dashboard upload
+  — the next merge to `main` simply deploys a newer version on top.
 - **Adding new files:** no changes needed — the workflow uploads the whole
-  repository except `.git`, `.github`, `README.md`, and `DEPLOYMENT.md`.
-  If you want to exclude other files from the deployed site, add them to the
-  `--exclude` list in `.github/workflows/deploy.yml`.
+  repository except `.git`, `.github`, `README.md`, `DEPLOYMENT.md`, and
+  `wrangler.toml`. To exclude other files from the deployed site, add them to
+  the `--exclude` list in `.github/workflows/deploy.yml`.
 
 ## Troubleshooting
 
 - **`Authentication error [code: 10000]`** — the API token is wrong, expired,
-  or missing the `Cloudflare Pages: Edit` permission. Recreate it (Step 3)
-  and update the `CLOUDFLARE_API_TOKEN` secret.
-- **`Project not found`** — `CLOUDFLARE_PROJECT_NAME` doesn't match the exact
-  project name in the dashboard, or `CLOUDFLARE_ACCOUNT_ID` points at a
-  different account.
+  or missing permissions. Recreate it with the **Edit Cloudflare Workers**
+  template (Step 2) and update the `CLOUDFLARE_API_TOKEN` secret.
+- **Errors about routes or custom domains** — the token's **Zone Resources**
+  don't include `kairat.me`, or the `pattern` in `wrangler.toml` doesn't match
+  the domain configured in the dashboard.
+- **A brand-new worker appeared instead of updating `sample`** — the `name`
+  in `wrangler.toml` doesn't exactly match the existing worker's name. Fix the
+  name, redeploy, and delete the accidental worker in the dashboard.
 - **Workflow doesn't start on merge** — make sure the workflow file exists on
   `main` (it only triggers once it has been merged there) and that Actions
   are enabled under **Settings → Actions → General**.
-- **Old content still showing on your domain** — check
-  **Workers & Pages → your project → Deployments** to confirm the new
-  deployment is the active production one; if it is, it's usually browser or
-  Cloudflare cache — try a hard refresh or **Caching → Purge Cache** for the
-  domain.
+- **Old content still showing on kairat.me** — confirm the new version is
+  active under **Workers & Pages → sample → Versions**; if it is, it's
+  usually browser or Cloudflare cache — try a hard refresh or
+  **Caching → Purge Cache** for the domain.
