@@ -108,6 +108,7 @@ byId.forEach(n => {
   }
 
   const g = document.createElementNS(NS, "g");
+  g.dataset.id = n.id;
   g.setAttribute("class",
     "node" + (n.depth === 0 ? " root" : "") + (n.depth === 1 ? " trunk" : "") + (n.star ? " star" : ""));
   g.setAttribute("transform", `translate(${n.x},${n.y})`);
@@ -268,7 +269,20 @@ stage.addEventListener("pointermove", e => {
     last = { x: e.clientX, y: e.clientY }; apply();
   }
 });
-const up = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) { last = null; stage.classList.remove("dragging"); } };
+const up = e => {
+  pts.delete(e.pointerId);
+  if (pts.size < 2) pinch = null;
+  if (!pts.size) {
+    last = null; stage.classList.remove("dragging");
+    /* Басуу: pointer capture click окуясын түйүнгө жеткирбейт,
+       ошондуктан жылбаган басууда түйүндү өзүбүз табабыз */
+    if (!moved) {
+      const t = document.elementFromPoint(e.clientX, e.clientY);
+      const g = t && t.closest ? t.closest(".node") : null;
+      if (g) select(byId.get(g.dataset.id));
+    }
+  }
+};
 stage.addEventListener("pointerup", up);
 stage.addEventListener("pointercancel", up);
 function two() { return [...pts.values()]; }
