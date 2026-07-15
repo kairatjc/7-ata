@@ -15,6 +15,8 @@
   <svg id="tree" aria-label="Ногой санжырасынын дарагы"></svg>
 </div>
 
+<div id="gens" aria-hidden="true"></div>
+
 <header>
   <div class="brand">
     <svg class="horns" viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" aria-hidden="true">
@@ -44,6 +46,7 @@
   <div class="zoom">
     <button id="zin"  title="Чоңойтуу" aria-label="Чоңойтуу">＋</button>
     <button id="zout" title="Кичирейтүү" aria-label="Кичирейтүү">－</button>
+    <button id="zhome" title="Башкы көрүнүш" aria-label="Башкы көрүнүш">⌂</button>
     <button id="zfit" title="Толук көрүнүш" aria-label="Толук көрүнүш">⤢</button>
   </div>
 </header>
@@ -52,6 +55,10 @@
   <button class="close" id="pclose" aria-label="Жабуу">×</button>
   <p class="gen" id="pgen"></p>
   <ul class="kin" id="pkin"></ul>
+  <div id="psibs-blk">
+    <p class="blk-title">Бир туугандары</p>
+    <ul class="path" id="psibs"></ul>
+  </div>
   <p class="blk-title">Ата-теги</p>
   <ul class="path" id="ppath"></ul>
   <p class="blk-title">Сандар</p>
@@ -62,7 +69,7 @@
 </aside>
 
 <p class="legend">
-  <b>Кутуча</b> — бир туугандар &nbsp;·&nbsp; <b>Жебе</b> — атадан балага<br>
+  <b>Кутуча</b> — бир адам &nbsp;·&nbsp; <b>Жебе</b> — атадан балага &nbsp;·&nbsp; <b>Кызыл</b> — түз ата-тек<br>
   Сүйрөп жылдырыңыз · дөңгөлөк менен чоңойтуңуз · басып тааныңыз
 </p>
 
