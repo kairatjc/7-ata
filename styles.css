@@ -23,6 +23,13 @@ html, body {
   font-family: var(--body);
   overflow: hidden;
   -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input, textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* ── Талаа (canvas) ──────────────────────────────────────── */
