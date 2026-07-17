@@ -1,7 +1,7 @@
 /* ── Токендер ─────────────────────────────────────────────── */
 :root {
-  --field:      #22302A;   /* кийиз – караңгы жашыл */
-  --field-deep: #1A251F;
+  --field:      #223244;   /* кийиз – караңгы көк */
+  --field-deep: #1A2532;
   --tile:       #F1E9D8;   /* ак кийиз */
   --tile-edge:  #8A3B2E;   /* кызыл сайма */
   --cord:       #C7A344;   /* жип – саргыч */
@@ -36,7 +36,7 @@ input, textarea {
 #stage {
   position: fixed; inset: 0;
   background:
-    radial-gradient(120% 90% at 50% 0%, #2B3A33 0%, var(--field) 45%, var(--field-deep) 100%);
+    radial-gradient(120% 90% at 50% 0%, #2B3E52 0%, var(--field) 45%, var(--field-deep) 100%);
   cursor: grab;
   touch-action: none;
 }
@@ -124,7 +124,7 @@ svg#tree { position: absolute; inset: 0; width: 100%; height: 100%; }
   white-space: nowrap;
   font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
   color: var(--cord); opacity: 0;
-  background: rgba(26,37,31,.72);
+  background: rgba(26,37,50,.72);
   padding: 3px 7px; border-radius: 2px;
   border-left: 2px solid var(--cord);
   transition: opacity .2s;
@@ -136,7 +136,7 @@ header {
   position: fixed; top: 0; left: 0; right: 0; z-index: 5;
   display: flex; align-items: center; gap: 18px;
   padding: 14px 20px;
-  background: linear-gradient(180deg, rgba(26,37,31,.96) 0%, rgba(26,37,31,.82) 70%, rgba(26,37,31,0) 100%);
+  background: linear-gradient(180deg, rgba(26,37,50,.96) 0%, rgba(26,37,50,.82) 70%, rgba(26,37,50,0) 100%);
   pointer-events: none;
 }
 header > * { pointer-events: auto; }
@@ -205,7 +205,7 @@ h1 {
 /* ── Маалымат панели ─────────────────────────────────────── */
 #panel {
   position: fixed; top: 0; right: 0; bottom: 0; width: 320px; z-index: 6;
-  background: #1C2721;
+  background: #1C2734;
   border-left: 1px solid rgba(199,163,68,.35);
   padding: 26px 24px;
   overflow-y: auto;
@@ -268,7 +268,7 @@ h1 {
 @media (max-width: 760px) {
   header {
     flex-wrap: wrap; gap: 8px; padding: 10px 12px 8px;
-    background: linear-gradient(180deg, rgba(26,37,31,.97) 0%, rgba(26,37,31,.9) 80%, rgba(26,37,31,0) 100%);
+    background: linear-gradient(180deg, rgba(26,37,50,.97) 0%, rgba(26,37,50,.9) 80%, rgba(26,37,50,0) 100%);
   }
   .sub { display: none; }
   h1 { font-size: 13px; letter-spacing: .1em; }
@@ -288,7 +288,7 @@ h1 {
   }
   .zoom button {
     width: 44px; height: 44px; font-size: 18px;
-    background: rgba(28,39,33,.92);
+    background: rgba(28,39,52,.92);
     border-color: rgba(199,163,68,.4);
   }
 
