@@ -46,7 +46,7 @@ let cursor = 0;
   n.children.forEach(assignX);
   cursor += GROUP_GAP;                       /* үй-бүлөлөрдүн ортосу */
   const star = n.children.find(c => c.star);
-  if (n.star && star) {
+  if (star) {
     n.x = star.x + star.w / 2 - n.w / 2;     /* * сызыгы түз болсун */
   } else {
     const a = n.children[0], b = n.children[n.children.length - 1];
