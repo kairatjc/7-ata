@@ -9,7 +9,8 @@
    ============================================================ */
 
 const SANJYRA = [
-  { id: "n1", parent: null, name: "Ногой", star: true },
+  { id: "belek", parent: null, name: "Белек", star: true },
+  { id: "n1", parent: "belek", name: "Ногой" },
     { id: "n2", parent: "n1", name: "Манас", star: true, branch: "manas" },
       { id: "n3", parent: "n2", name: "Рыскулбек", star: true },
         { id: "n4", parent: "n3", name: "Байсерке", star: true },
