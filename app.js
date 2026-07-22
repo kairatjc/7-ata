@@ -1,70 +1,57 @@
 /* ── Модель ───────────────────────────────────────────────── */
 const NS = "http://www.w3.org/2000/svg";
-const NODE_H = 30, ROW_GAP = 58, SIB_GAP = 10, GROUP_GAP = 26;
+const NODE_H = 30, ROW_GAP = 58, SIB_GAP = 10, GROUP_GAP = 26, ICON_PAD = 22;
 
 const byId = new Map();
 SANJYRA.forEach(n => byId.set(n.id, { ...n, children: [] }));
 byId.forEach(n => { if (n.parent) byId.get(n.parent).children.push(n); });
 const root = [...byId.values()].find(n => !n.parent);
 
-/* тереңдик + бутак + өлчөм */
-(function walk(n, depth, branch) {
-  n.depth = depth;
-  n.branch = n.branch || branch;
-  n.w = Math.max(56, 20 + n.name.length * 7.4);
+/* туруктуу өлчөм жана бутак-белги (тереңдикке көз каранды эмес,
+   бир жолу гана эсептелет) */
+byId.forEach(n => {
   n.h = NODE_H;
-  n.children.forEach(c => walk(c, depth + 1, n.branch));
-})(root, 0, null);
+  n.baseW = Math.max(56, 20 + n.name.length * 7.4) + (n.kind ? ICON_PAD : 0);
+});
+/* тамыр түйүн чоңураак/калың арип менен тартылат (.node.root .name) —
+   узунураак атка жетиштүү орун калсын үчүн кутучасын кеңейтебиз */
+root.baseW += 34;
+(function walkBranch(n, branch) {
+  n.branch = n.branch || branch;
+  n.children.forEach(c => walkBranch(c, n.branch));
+})(root, null);
 
-/* ── Балдарды иреттөө ─────────────────────────────────────────
-   Жылдызчалуу (түз ата-тек) бала — ортодо, калгандары эки
-   жагына салмагы боюнча бөлүштүрүлөт. Ошентип * сызыгы
-   дарактын так ортосунан түз ылдый түшөт. */
-(function subW(n) {
-  n.children.forEach(subW);
-  n.sw = n.children.length
-    ? Math.max(n.w, n.children.reduce((s, c) => s + c.sw, 0) + SIB_GAP * (n.children.length - 1))
-    : n.w;
-})(root);
+function descendants(n) { return n.children.reduce((s, c) => s + 1 + descendants(c), 0); }
+function realParent(n) { return n.parent ? byId.get(n.parent) : null; }
+function chain(n) { const c = []; for (let k = n; k; k = realParent(k)) c.push(k); return c.reverse(); }
 
-(function order(n) {
-  const star = n.children.find(c => c.star);
-  if (star && n.children.length > 2) {
-    const rest = n.children.filter(c => c !== star).sort((a, b) => b.sw - a.sw);
-    const left = [], right = [];
-    let lw = 0, rw = 0;
-    rest.forEach(c => { if (lw <= rw) { left.push(c); lw += c.sw; } else { right.push(c); rw += c.sw; } });
-    n.children = [...left.reverse(), star, ...right];
-  }
-  n.children.forEach(order);
-})(root);
+/* ── 4-тапшырма: Долон бийден Ногойго чейинки чынжырды бүктөө ─
+   "Долон Бий" (кошулбайт) ... "Ногой" (кошулбайт) аралыгы бир
+   баскыч менен катары бүт жашырылат/ачылат. */
+const ANCESTOR_FROM = "dolon", ANCESTOR_TO = "n1";
+let ancestorsCollapsed = true;
 
-/* ── Жайгаштыруу ──────────────────────────────────────────── */
-let cursor = 0;
-(function assignX(n) {
-  if (!n.children.length) { n.x = cursor; cursor += n.w + SIB_GAP; return; }
-  n.children.forEach(assignX);
-  cursor += GROUP_GAP;                       /* үй-бүлөлөрдүн ортосу */
-  const star = n.children.find(c => c.star);
-  if (star) {
-    n.x = star.x + star.w / 2 - n.w / 2;     /* * сызыгы түз болсун */
-  } else {
-    const a = n.children[0], b = n.children[n.children.length - 1];
-    n.x = (a.x + b.x + b.w) / 2 - n.w / 2;
-  }
-})(root);
+const segmentIds = new Set();
+(function () {
+  let cur = realParent(byId.get(ANCESTOR_TO));
+  while (cur && cur.id !== ANCESTOR_FROM) { segmentIds.add(cur.id); cur = realParent(cur); }
+})();
+const noToggle = new Set([ANCESTOR_FROM, ...segmentIds]);
 
-byId.forEach(n => { n.y = n.depth * (NODE_H + ROW_GAP); });
+/* ── 3-тапшырма: кызыл сызыкта жок бутактарды жеке жашыруу ──── */
+const collapsed = new Set();
+byId.forEach(n => { if (!n.star && n.children.length) collapsed.add(n.id); });
 
-const all = [...byId.values()];
-const GENS = Math.max(...all.map(n => n.depth)) + 1;
-const BB = {
-  x0: Math.min(...all.map(n => n.x)) - 40,
-  x1: Math.max(...all.map(n => n.x + n.w)) + 40,
-  y0: -40,
-  y1: Math.max(...all.map(n => n.y + n.h)) + 40
-};
-const CENTER_X = root.x + root.w / 2;        /* * сызыгынын огу */
+function kids(n) {
+  if (n.id === ANCESTOR_FROM && ancestorsCollapsed) return [byId.get(ANCESTOR_TO)];
+  if (collapsed.has(n.id)) return [];
+  return n.children;
+}
+function effParent(n) {
+  if (n.id === ANCESTOR_TO && ancestorsCollapsed) return byId.get(ANCESTOR_FROM);
+  return realParent(n);
+}
+function toggleCollapse(id) { collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id); render(); }
 
 /* ── Тартуу ───────────────────────────────────────────────── */
 const svg = document.getElementById("tree");
@@ -81,82 +68,192 @@ const vp = svg.querySelector("#vp");
 const gRows = svg.querySelector("#rows");
 const gLinks = svg.querySelector("#links");
 const gNodes = svg.querySelector("#nodes");
-const linkOf = new Map(), elOf = new Map();
+const gensBox = document.getElementById("gens");
+let linkOf = new Map(), elOf = new Map(), genEls = [];
+let BB = null, CENTER_X = 0, GENS = 0;
 
-/* муундардын катар сызыктары */
-for (let d = 0; d < GENS; d++) {
-  const y = d * (NODE_H + ROW_GAP) + NODE_H / 2;
-  const line = document.createElementNS(NS, "line");
-  line.setAttribute("x1", BB.x0); line.setAttribute("x2", BB.x1);
-  line.setAttribute("y1", y); line.setAttribute("y2", y);
-  line.setAttribute("class", "genline");
-  gRows.appendChild(line);
-}
+function render() {
+  /* тереңдик + өлчөм (көрүнгөн түйүндөр гана) */
+  const visible = [];
+  (function walk(n, depth) {
+    n.depth = depth;
+    n.w = n.baseW;
+    n.y = depth * (NODE_H + ROW_GAP);
+    visible.push(n);
+    kids(n).forEach(c => walk(c, depth + 1));
+  })(root, 0);
 
-byId.forEach(n => {
-  if (n.parent) {
-    const p = byId.get(n.parent);
-    const x1 = p.x + p.w / 2, y1 = p.y + p.h;
-    const x2 = n.x + n.w / 2, y2 = n.y - 7;
-    const my = (y1 + y2) / 2;
-    const path = document.createElementNS(NS, "path");
-    path.setAttribute("d", `M${x1} ${y1} C${x1} ${my}, ${x2} ${my}, ${x2} ${y2}`);
-    path.setAttribute("class", "link" + (n.star ? " star" : ""));
-    path.setAttribute("marker-end", "url(#ar)");
-    gLinks.appendChild(path);
-    linkOf.set(n.id, path);
+  (function subW(n) {
+    const ch = kids(n);
+    ch.forEach(subW);
+    n.sw = ch.length
+      ? Math.max(n.w, ch.reduce((s, c) => s + c.sw, 0) + SIB_GAP * (ch.length - 1))
+      : n.w;
+  })(root);
+
+  /* Жылдызчалуу (түз ата-тек) бала — сол жакта, so ал сызык
+     туш келди сол четинде түз ылдый түшөт. Калган бутактар оң
+     жакка, эң кичинекейи жылдыздын жанына, чоңураагы андан ары
+     жылдырылат — бош орун талап кылганда гана алысыраак турат. */
+  (function order(n) {
+    const ch = kids(n);
+    if (ch === n.children && ch.length > 1) {
+      const star = n.children.find(c => c.star);
+      if (star) {
+        const rest = n.children.filter(c => c !== star).sort((a, b) => a.sw - b.sw);
+        n.children = [star, ...rest];
+      }
+    }
+    kids(n).forEach(order);
+  })(root);
+
+  let cursor = 0;
+  (function assignX(n) {
+    const ch = kids(n);
+    if (!ch.length) { n.x = cursor; cursor += n.w + SIB_GAP; return; }
+    ch.forEach(assignX);
+    cursor += GROUP_GAP;
+    const star = ch.find(c => c.star);
+    if (star) {
+      n.x = star.x + star.w / 2 - n.w / 2;
+    } else {
+      const a = ch[0], b = ch[ch.length - 1];
+      n.x = (a.x + b.x + b.w) / 2 - n.w / 2;
+    }
+  })(root);
+
+  GENS = Math.max(...visible.map(n => n.depth)) + 1;
+  BB = {
+    x0: Math.min(...visible.map(n => n.x)) - 40,
+    x1: Math.max(...visible.map(n => n.x + n.w)) + 40,
+    y0: -40,
+    y1: Math.max(...visible.map(n => n.y + n.h)) + 40
+  };
+  CENTER_X = root.x + root.w / 2;
+
+  gRows.innerHTML = ""; gLinks.innerHTML = ""; gNodes.innerHTML = "";
+  linkOf = new Map(); elOf = new Map();
+
+  for (let d = 0; d < GENS; d++) {
+    const y = d * (NODE_H + ROW_GAP) + NODE_H / 2;
+    const line = document.createElementNS(NS, "line");
+    line.setAttribute("x1", BB.x0); line.setAttribute("x2", BB.x1);
+    line.setAttribute("y1", y); line.setAttribute("y2", y);
+    line.setAttribute("class", "genline");
+    gRows.appendChild(line);
   }
 
-  const g = document.createElementNS(NS, "g");
-  g.dataset.id = n.id;
-  g.setAttribute("class",
-    "node" + (n.depth === 0 ? " root" : "") + (n.depth === 1 ? " trunk" : "") + (n.star ? " star" : ""));
-  g.setAttribute("transform", `translate(${n.x},${n.y})`);
-  g.setAttribute("tabindex", "0");
-  g.setAttribute("role", "button");
-  g.setAttribute("aria-label", n.name);
+  visible.forEach(n => {
+    const p = effParent(n);
+    if (p) {
+      const bypass = n.id === ANCESTOR_TO && ancestorsCollapsed;
+      const x1 = p.x + p.w / 2, y1 = p.y + p.h;
+      const x2 = n.x + n.w / 2, y2 = n.y - 7;
+      const my = (y1 + y2) / 2;
+      const path = document.createElementNS(NS, "path");
+      path.setAttribute("d", `M${x1} ${y1} C${x1} ${my}, ${x2} ${my}, ${x2} ${y2}`);
+      path.setAttribute("class", "link" + (n.star ? " star" : "") + (bypass ? " bypass" : ""));
+      path.setAttribute("marker-end", "url(#ar)");
+      gLinks.appendChild(path);
+      linkOf.set(n.id, path);
 
-  const r = document.createElementNS(NS, "rect");
-  r.setAttribute("class", "plate");
-  r.setAttribute("width", n.w);
-  r.setAttribute("height", n.h);
-  g.appendChild(r);
+      if (bypass) {
+        const label = document.createElementNS(NS, "text");
+        label.setAttribute("x", (x1 + x2) / 2 + 10);
+        label.setAttribute("y", my);
+        label.setAttribute("class", "bypass-label");
+        label.textContent = `⋯ ${segmentIds.size} муун жашырылды`;
+        gLinks.appendChild(label);
+      }
+    }
 
-  const t = document.createElementNS(NS, "text");
-  t.setAttribute("class", "name");
-  t.setAttribute("x", n.w / 2);
-  t.setAttribute("text-anchor", "middle");
-  t.setAttribute("y", n.h / 2 + 1);
-  t.textContent = n.name;
-  g.appendChild(t);
+    const g = document.createElementNS(NS, "g");
+    g.dataset.id = n.id;
+    g.setAttribute("class",
+      "node" + (n === root ? " root" : "") + (n.id === "n1" ? " trunk" : "") +
+      (n.star ? " star" : "") + (n.kind ? " " + n.kind : ""));
+    g.setAttribute("transform", `translate(${n.x},${n.y})`);
+    g.setAttribute("tabindex", "0");
+    g.setAttribute("role", "button");
+    g.setAttribute("aria-label", n.name);
 
-  g.addEventListener("pointerenter", () => hot(n, true));
-  g.addEventListener("pointerleave", () => hot(n, false));
-  g.addEventListener("focus", () => hot(n, true));
-  g.addEventListener("blur", () => hot(n, false));
-  g.addEventListener("click", e => { e.stopPropagation(); select(n); });
-  g.addEventListener("keydown", e => { if (e.key === "Enter") select(n); });
+    const r = document.createElementNS(NS, "rect");
+    r.setAttribute("class", "plate");
+    r.setAttribute("width", n.w);
+    r.setAttribute("height", n.h);
+    g.appendChild(r);
 
-  gNodes.appendChild(g);
-  elOf.set(n.id, g);
-});
+    const t = document.createElementNS(NS, "text");
+    t.setAttribute("class", "name");
+    t.setAttribute("y", n.h / 2 + 1);
+    if (n.kind) {
+      const icon = document.createElementNS(NS, "text");
+      icon.setAttribute("class", "icon");
+      icon.setAttribute("x", 11);
+      icon.setAttribute("y", n.h / 2 + 1);
+      icon.setAttribute("text-anchor", "middle");
+      icon.textContent = n.kind === "tribe" ? "⛺" : "♛";
+      g.appendChild(icon);
+      t.setAttribute("x", 22);
+      t.setAttribute("text-anchor", "start");
+    } else {
+      t.setAttribute("x", n.w / 2);
+      t.setAttribute("text-anchor", "middle");
+    }
+    t.textContent = n.name;
+    g.appendChild(t);
 
-/* муун белгилери (экранга байланган) */
-const gensBox = document.getElementById("gens");
-const genEls = [];
-for (let d = 0; d < GENS; d++) {
-  const el = document.createElement("span");
-  el.textContent = `${d + 1}-муун`;
-  gensBox.appendChild(el);
-  genEls.push(el);
+    g.addEventListener("pointerenter", () => hot(n, true));
+    g.addEventListener("pointerleave", () => hot(n, false));
+    g.addEventListener("focus", () => hot(n, true));
+    g.addEventListener("blur", () => hot(n, false));
+    g.addEventListener("click", e => { if (e.target.closest(".toggle")) return; e.stopPropagation(); select(n); });
+    g.addEventListener("keydown", e => { if (e.key === "Enter") select(n); });
+
+    if (n.children.length && !noToggle.has(n.id)) {
+      const isClosed = collapsed.has(n.id);
+      const tg = document.createElementNS(NS, "g");
+      tg.setAttribute("class", "toggle" + (isClosed ? " closed" : " open"));
+      tg.setAttribute("transform", `translate(${n.w / 2},${n.h + 9})`);
+      const tc = document.createElementNS(NS, "circle");
+      tc.setAttribute("r", 8);
+      tg.appendChild(tc);
+      const tt = document.createElementNS(NS, "text");
+      tt.setAttribute("text-anchor", "middle");
+      tt.setAttribute("y", 3.5);
+      tt.textContent = isClosed ? "+" : "–";
+      tg.appendChild(tt);
+      const title = document.createElementNS(NS, "title");
+      title.textContent = (isClosed ? "Ачуу" : "Жашыруу") + ` (${descendants(n)} урпак)`;
+      tg.appendChild(title);
+      /* Чыныгы басуу төмөндөгү #stage pointerup четтетүүсү аркылуу гана
+         иштейт (pointer capture "click" окуясын түйүнгө жеткирбейт),
+         ошондуктан бул жерде өзүнчө click угузгуч кошулбайт —
+         кош которулуудан сактоо үчүн */
+      g.appendChild(tg);
+    }
+
+    gNodes.appendChild(g);
+    elOf.set(n.id, g);
+  });
+
+  gensBox.innerHTML = ""; genEls = [];
+  for (let d = 0; d < GENS; d++) {
+    const el = document.createElement("span");
+    el.textContent = `${d + 1}-муун`;
+    gensBox.appendChild(el);
+    genEls.push(el);
+  }
+
+  applyBranchFilter();
+  apply();
 }
 
 /* ── Ата-тек жолун жарык кылуу ───────────────────────────── */
-function chain(n) { const c = []; for (let k = n; k; k = k.parent ? byId.get(k.parent) : null) c.push(k); return c.reverse(); }
-
 function hot(n, on) {
   chain(n).forEach(a => {
-    elOf.get(a.id).classList.toggle("hot", on);
+    const el = elOf.get(a.id);
+    if (el) el.classList.toggle("hot", on);
     const l = linkOf.get(a.id);
     if (l) { l.classList.toggle("hot", on); l.setAttribute("marker-end", on ? "url(#arh)" : "url(#ar)"); }
   });
@@ -166,15 +263,20 @@ function hot(n, on) {
 const panel = document.getElementById("panel");
 let selected = null;
 
-function descendants(n) { return n.children.reduce((s, c) => s + 1 + descendants(c), 0); }
+const KIND_LABEL = { tribe: "Уруунун аты", leader: "Уруу башчысы / атактуу инсан" };
 
 function select(n) {
-  if (selected) elOf.get(selected.id).classList.remove("sel");
+  if (selected) { const prevEl = elOf.get(selected.id); if (prevEl) prevEl.classList.remove("sel"); }
   selected = n;
-  elOf.get(n.id).classList.add("sel");
+  const el = elOf.get(n.id); if (el) el.classList.add("sel");
 
   document.getElementById("pgen").textContent = `${n.depth + 1}-муун`;
-  document.getElementById("pkin").innerHTML = `<li>${n.name}</li>`;
+  document.getElementById("pkin").innerHTML = `<li>${n.name}</li>` +
+    (n.kind ? `<li class="tag">${KIND_LABEL[n.kind]}</li>` : "");
+
+  const descEl = document.getElementById("pdesc");
+  if (n.desc) { descEl.textContent = n.desc; descEl.style.display = ""; }
+  else { descEl.style.display = "none"; }
 
   const sibs = n.parent ? byId.get(n.parent).children.filter(c => c !== n) : [];
   document.getElementById("psibs-blk").style.display = sibs.length ? "" : "none";
@@ -184,18 +286,56 @@ function select(n) {
   document.getElementById("ppath").innerHTML = path
     .map(a => `<li data-go="${a.id}">${a.name}</li>`).join("");
   document.querySelectorAll("#ppath li, #psibs li").forEach(li =>
-    li.onclick = () => { const t = byId.get(li.dataset.go); select(t); center(t); });
+    li.onclick = () => revealAndGoto(byId.get(li.dataset.go)));
 
   document.getElementById("pkids").textContent = n.children.length;
   document.getElementById("pall").textContent = descendants(n);
+
+  const expandBtn = document.getElementById("pexpand");
+  if (n.children.length && collapsed.has(n.id)) {
+    expandBtn.style.display = "";
+    expandBtn.textContent = `Бутакты ачуу (${descendants(n)})`;
+    expandBtn.onclick = () => { collapsed.delete(n.id); render(); select(n); };
+  } else {
+    expandBtn.style.display = "none";
+  }
 
   panel.classList.add("open");
 }
 document.getElementById("pclose").onclick = () => {
   panel.classList.remove("open");
-  if (selected) elOf.get(selected.id).classList.remove("sel");
+  if (selected) { const el = elOf.get(selected.id); if (el) el.classList.remove("sel"); }
   selected = null;
 };
+
+/* Жашырылган бутактагы/чынжырдагы түйүнгө өтүү: керек болсо ачат */
+function revealAndGoto(n) {
+  let dirty = false;
+  for (let a = realParent(n); a; a = realParent(a)) {
+    if (collapsed.delete(a.id)) dirty = true;
+  }
+  if (ancestorsCollapsed && chain(n).some(a => segmentIds.has(a.id))) {
+    ancestorsCollapsed = false; dirty = true; syncAnctoggle();
+  }
+  if (dirty) render();
+  select(n);
+  center(n);
+}
+
+/* ── Ата-баба чынжырын ачуу/жашыруу баскычы ─────────────────── */
+const anctoggle = document.getElementById("anctoggle");
+function syncAnctoggle() {
+  anctoggle.classList.toggle("on", !ancestorsCollapsed);
+  anctoggle.textContent = ancestorsCollapsed
+    ? `Ата-бабаларды ачуу (${segmentIds.size})`
+    : "Ата-бабаларды жашыруу";
+}
+anctoggle.addEventListener("click", () => {
+  ancestorsCollapsed = !ancestorsCollapsed;
+  syncAnctoggle();
+  render();
+});
+syncAnctoggle();
 
 /* ── Жылдыруу жана масштаб ───────────────────────────────── */
 const stage = document.getElementById("stage");
@@ -203,7 +343,7 @@ let k = 1, tx = 0, ty = 0;
 
 function apply() {
   vp.setAttribute("transform", `translate(${tx},${ty}) scale(${k})`);
-  const roomy = (NODE_H + ROW_GAP) * k > 24;   /* тыгыз болсо жашырабыз */
+  const roomy = (NODE_H + ROW_GAP) * k > 24;
   genEls.forEach((el, d) => {
     const y = ty + (d * (NODE_H + ROW_GAP) + NODE_H / 2) * k;
     el.style.transform = `translateY(${y}px)`;
@@ -212,8 +352,6 @@ function apply() {
 }
 function topPad() { return innerWidth <= 760 ? 128 : 96; }
 
-/* Баштапкы көрүнүш: бүт муундар бийиктикке батат,
-   * сызыгы экрандын так ортосунда */
 function home() {
   const H = BB.y1 - BB.y0;
   k = Math.min(1, Math.max(0.42, (innerHeight - topPad() - 24) / H));
@@ -274,12 +412,16 @@ const up = e => {
   if (pts.size < 2) pinch = null;
   if (!pts.size) {
     last = null; stage.classList.remove("dragging");
-    /* Басуу: pointer capture click окуясын түйүнгө жеткирбейт,
-       ошондуктан жылбаган басууда түйүндү өзүбүз табабыз */
     if (!moved) {
       const t = document.elementFromPoint(e.clientX, e.clientY);
-      const g = t && t.closest ? t.closest(".node") : null;
-      if (g) select(byId.get(g.dataset.id));
+      const tgHit = t && t.closest ? t.closest(".toggle") : null;
+      if (tgHit) {
+        const g = tgHit.closest(".node");
+        if (g) toggleCollapse(g.dataset.id);
+      } else {
+        const g = t && t.closest ? t.closest(".node") : null;
+        if (g) select(byId.get(g.dataset.id));
+      }
     }
   }
 };
@@ -305,24 +447,31 @@ q.addEventListener("input", () => {
   byId.forEach(n => {
     const el = elOf.get(n.id);
     const m = v && n.name.toLowerCase().includes(v);
-    el.classList.toggle("hit", !!m);
+    if (el) el.classList.toggle("hit", !!m);
     if (m) hits.push(n);
   });
   qc.textContent = v ? (hits.length || "0") : "";
-  if (hits.length) center(hits[0]);
+  if (hits.length) revealAndGoto(hits[0]);
 });
 
 /* ── Бутак чыпкасы ───────────────────────────────────────── */
-document.querySelectorAll(".chip").forEach(btn => {
+let branchFilter = "all";
+function applyBranchFilter() {
+  byId.forEach(n => {
+    /* n.branch == null — жалпы ата-баба (ортоктош багыт), эч качан
+       көмүскөлөнбөйт; бутакка таандык болгондо гана дал келбесе өчөт */
+    const off = branchFilter !== "all" && n.branch != null && n.branch !== branchFilter;
+    const el = elOf.get(n.id); if (el) el.classList.toggle("dim", off);
+    const l = linkOf.get(n.id); if (l) l.classList.toggle("dim", off);
+  });
+}
+document.querySelectorAll(".chip[data-branch]").forEach(btn => {
   btn.onclick = () => {
-    document.querySelectorAll(".chip").forEach(b => b.classList.toggle("on", b === btn));
-    const b = btn.dataset.branch;
-    byId.forEach(n => {
-      const off = b !== "all" && n.branch !== b && n.depth > 0;
-      elOf.get(n.id).classList.toggle("dim", off);
-      const l = linkOf.get(n.id); if (l) l.classList.toggle("dim", off);
-    });
+    document.querySelectorAll(".chip[data-branch]").forEach(b => b.classList.toggle("on", b === btn));
+    branchFilter = btn.dataset.branch;
+    applyBranchFilter();
   };
 });
 
+render();
 home();
