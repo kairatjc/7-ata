@@ -71,6 +71,13 @@ svg#tree { position: absolute; inset: 0; width: 100%; height: 100%; }
 /* түз ата-тек сызыгы (*) */
 .link.star { stroke: var(--accent); stroke-width: 2.2; opacity: .95; }
 
+/* ата-бабалар чынжыры бүктөлгөндө көрүнгөн байланыш */
+.link.bypass { stroke-dasharray: 3 5; }
+.bypass-label {
+  fill: var(--cord); font-size: 10.5px; font-style: italic;
+  dominant-baseline: middle;
+}
+
 /* муундардын катар сызыктары */
 .genline {
   stroke: rgba(241,233,216,.07);
@@ -112,6 +119,30 @@ svg#tree { position: absolute; inset: 0; width: 100%; height: 100%; }
 .node.star .plate { fill: #F6E3C8; stroke: var(--accent); stroke-width: 2; }
 .node.star .name { font-weight: 700; }
 .node.root.star .plate { fill: var(--accent); }
+
+/* уруу башчысы / атактуу инсан жана уруунун аты */
+.node .icon { font-size: 12px; }
+.node.leader .plate { stroke: var(--cord); stroke-width: 1.8; }
+.node.tribe .plate { fill: #DCE7DE; stroke: #4C7A63; stroke-width: 1.8; }
+.node.tribe .name { font-style: italic; }
+
+/* бутакты ачуу/жашыруу баскычы */
+.toggle circle {
+  fill: var(--field-deep);
+  stroke: var(--cord);
+  stroke-width: 1.4;
+}
+.toggle text {
+  fill: var(--cord);
+  font-size: 11px;
+  font-weight: 700;
+  dominant-baseline: middle;
+}
+.toggle { cursor: pointer; }
+.toggle:hover circle { fill: var(--accent); stroke: var(--accent); }
+.toggle:hover text { fill: var(--tile); }
+.toggle.closed circle { fill: var(--accent); stroke: var(--accent); }
+.toggle.closed text { fill: var(--tile); }
 
 /* муун белгилери */
 #gens {
@@ -189,6 +220,9 @@ h1 {
 .chip:hover { color: var(--tile); border-color: rgba(241,233,216,.4); }
 .chip.on { background: var(--tile); color: var(--ink); border-color: var(--tile); font-weight: 600; }
 
+.anc-btn { white-space: nowrap; }
+.anc-btn.on { background: var(--cord); color: var(--ink); border-color: var(--cord); font-weight: 600; }
+
 /* Масштаб */
 .zoom { display: flex; gap: 6px; }
 .zoom button {
@@ -233,6 +267,30 @@ h1 {
   border-left: 2px solid var(--accent);
   margin-bottom: 3px;
 }
+.kin li.tag {
+  font-family: var(--body); font-size: 11px; font-weight: 500;
+  letter-spacing: .04em; text-transform: uppercase;
+  color: var(--cord); border-left-color: var(--cord);
+  padding-top: 0; padding-bottom: 4px;
+}
+.desc {
+  font-size: 13px; line-height: 1.6; color: var(--muted);
+  margin: -14px 0 20px;
+}
+.expand-btn {
+  display: none;
+  width: 100%;
+  margin: 0 0 22px;
+  padding: 9px 12px;
+  background: rgba(199,163,68,.12);
+  border: 1px solid rgba(199,163,68,.4);
+  border-radius: 2px;
+  color: var(--cord);
+  font-family: var(--body); font-size: 12.5px; font-weight: 600;
+  cursor: pointer;
+  transition: all .18s;
+}
+.expand-btn:hover { background: var(--cord); color: var(--ink); }
 .blk-title {
   font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase;
   color: var(--muted); margin: 0 0 10px;
@@ -280,6 +338,7 @@ h1 {
   .search input { width: 100%; font-size: 16px; padding: 10px 12px; }
   .chips { order: 4; flex: 1 1 100%; }
   .chip { flex: 1; padding: 8px 6px; text-align: center; }
+  .anc-btn { order: 5; flex: 1 1 100%; text-align: center; }
 
   /* масштаб баскычтары — оң жакта, бармакка ыңгайлуу */
   .zoom {
