@@ -1,477 +1,408 @@
 /* ── Модель ───────────────────────────────────────────────── */
-const NS = "http://www.w3.org/2000/svg";
-const NODE_H = 30, ROW_GAP = 58, SIB_GAP = 10, GROUP_GAP = 26, ICON_PAD = 22;
-
-const byId = new Map();
-SANJYRA.forEach(n => byId.set(n.id, { ...n, children: [] }));
-byId.forEach(n => { if (n.parent) byId.get(n.parent).children.push(n); });
-const root = [...byId.values()].find(n => !n.parent);
-
-/* туруктуу өлчөм жана бутак-белги (тереңдикке көз каранды эмес,
-   бир жолу гана эсептелет) */
-byId.forEach(n => {
-  n.h = NODE_H;
-  n.baseW = Math.max(56, 20 + n.name.length * 7.4) + (n.kind ? ICON_PAD : 0);
-});
-/* тамыр түйүн чоңураак/калың арип менен тартылат (.node.root .name) —
-   узунураак атка жетиштүү орун калсын үчүн кутучасын кеңейтебиз */
-root.baseW += 34;
-(function walkBranch(n, branch) {
-  n.branch = n.branch || branch;
-  n.children.forEach(c => walkBranch(c, n.branch));
-})(root, null);
-
-function descendants(n) { return n.children.reduce((s, c) => s + 1 + descendants(c), 0); }
-function realParent(n) { return n.parent ? byId.get(n.parent) : null; }
-function chain(n) { const c = []; for (let k = n; k; k = realParent(k)) c.push(k); return c.reverse(); }
-
-/* ── 4-тапшырма: Долон бийден Ногойго чейинки чынжырды бүктөө ─
-   "Долон Бий" (кошулбайт) ... "Ногой" (кошулбайт) аралыгы бир
-   баскыч менен катары бүт жашырылат/ачылат. */
+const ROOT_ID = "dolon";
 const ANCESTOR_FROM = "dolon", ANCESTOR_TO = "n1";
-let ancestorsCollapsed = true;
 
-const segmentIds = new Set();
-(function () {
-  let cur = realParent(byId.get(ANCESTOR_TO));
-  while (cur && cur.id !== ANCESTOR_FROM) { segmentIds.add(cur.id); cur = realParent(cur); }
-})();
-const noToggle = new Set([ANCESTOR_FROM, ...segmentIds]);
+let nodes, byId, childMap, segmentIds, segmentIdSet;
 
-/* ── 3-тапшырма: кызыл сызыкта жок бутактарды жеке жашыруу ──── */
-const collapsed = new Set();
-byId.forEach(n => { if (!n.star && n.children.length) collapsed.add(n.id); });
+function buildData() {
+  nodes = SANJYRA.map(n => ({ ...n, star: !!n.star, kind: n.kind || null, branch: n.branch || null, desc: n.desc || null }));
+  byId = {}; childMap = {};
+  nodes.forEach(n => { byId[n.id] = n; childMap[n.id] = []; });
+  nodes.forEach(n => { if (n.parent) childMap[n.parent].push(n); });
+  // star child first within each parent
+  Object.values(childMap).forEach(a => a.sort((x, y) => (y.star ? 1 : 0) - (x.star ? 1 : 0)));
+  // gen number (1-based), branch inheritance
+  nodes.forEach(n => {
+    let g = 1, p = n; while (p.parent) { g++; p = byId[p.parent]; } n.gen = g;
+    let b = null, q = n; while (q) { if (q.branch) { b = q.branch; break; } q = q.parent ? byId[q.parent] : null; } n._branch = b;
+  });
+  const sub = id => { let c = 0; for (const k of childMap[id]) c += 1 + sub(k.id); return c; };
+  nodes.forEach(n => { n._sub = sub(n.id); n._kids = childMap[n.id].length; });
 
-function kids(n) {
-  if (n.id === ANCESTOR_FROM && ancestorsCollapsed) return [byId.get(ANCESTOR_TO)];
-  if (collapsed.has(n.id)) return [];
-  return n.children;
+  // ancestor chain hidden by default: everyone strictly between ANCESTOR_FROM and ANCESTOR_TO
+  segmentIds = [];
+  let cur = byId[ANCESTOR_TO].parent ? byId[byId[ANCESTOR_TO].parent] : null;
+  while (cur && cur.id !== ANCESTOR_FROM) { segmentIds.push(cur.id); cur = cur.parent ? byId[cur.parent] : null; }
+  segmentIdSet = new Set(segmentIds);
 }
-function effParent(n) {
-  if (n.id === ANCESTOR_TO && ancestorsCollapsed) return byId.get(ANCESTOR_FROM);
-  return realParent(n);
+
+/* ── Абалы ────────────────────────────────────────────────── */
+let expanded, ancExpanded, filter, selected, matches, chain, cam, nodeEls;
+let visible, bbox, worldW, genEls, spineCenterX;
+const rowH = 92, topPad = 118;
+const mctx = document.createElement("canvas").getContext("2d");
+
+let el_app, el_viewport, el_world, el_svg, el_gens, el_nodes, el_knot,
+  el_header, el_search, el_count, el_chips, el_anc, el_panel, el_pbody, el_scrim;
+
+function captureEls() {
+  el_app = document.getElementById("app");
+  el_viewport = document.getElementById("viewport");
+  el_world = document.getElementById("world");
+  el_svg = document.getElementById("links");
+  el_gens = document.getElementById("gens");
+  el_nodes = document.getElementById("nodes");
+  el_knot = document.getElementById("knotlayer");
+  el_header = document.getElementById("bar");
+  el_search = document.getElementById("search");
+  el_count = document.getElementById("mcount");
+  el_chips = document.getElementById("chips");
+  el_anc = document.getElementById("ancbtn");
+  el_panel = document.getElementById("panel");
+  el_pbody = document.getElementById("pbody");
+  el_scrim = document.getElementById("scrim");
 }
-function toggleCollapse(id) { collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id); render(); }
 
-/* ── Тартуу ───────────────────────────────────────────────── */
-const svg = document.getElementById("tree");
-svg.innerHTML =
-  `<defs>
-     <marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-       <path d="M0 0 L8 4 L0 8 z" fill="var(--cord)"/></marker>
-     <marker id="arh" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-       <path d="M0 0 L8 4 L0 8 z" fill="var(--accent)"/></marker>
-   </defs>
-   <g id="vp"><g id="rows"></g><g id="links"></g><g id="nodes"></g></g>`;
+/* ── Көрүнгөн бутактар ───────────────────────────────────── */
+function visChildren(n) {
+  if (!expanded.has(n.id)) return [];
+  if (n.id === ANCESTOR_FROM && !ancExpanded) return [byId[ANCESTOR_TO]];
+  return childMap[n.id];
+}
 
-const vp = svg.querySelector("#vp");
-const gRows = svg.querySelector("#rows");
-const gLinks = svg.querySelector("#links");
-const gNodes = svg.querySelector("#nodes");
-const gensBox = document.getElementById("gens");
-let linkOf = new Map(), elOf = new Map(), genEls = [];
-let BB = null, CENTER_X = 0, GENS = 0;
-
-function render() {
-  /* тереңдик + өлчөм (көрүнгөн түйүндөр гана) */
-  const visible = [];
-  (function walk(n, depth) {
-    n.depth = depth;
-    n.w = n.baseW;
-    n.y = depth * (NODE_H + ROW_GAP);
-    visible.push(n);
-    kids(n).forEach(c => walk(c, depth + 1));
-  })(root, 0);
-
-  (function subW(n) {
-    const ch = kids(n);
-    ch.forEach(subW);
-    n.sw = ch.length
-      ? Math.max(n.w, ch.reduce((s, c) => s + c.sw, 0) + SIB_GAP * (ch.length - 1))
-      : n.w;
-  })(root);
-
-  /* Жылдызчалуу (түз ата-тек) бала — сол жакта, so ал сызык
-     туш келди сол четинде түз ылдый түшөт. Калган бутактар оң
-     жакка, эң кичинекейи жылдыздын жанына, чоңураагы андан ары
-     жылдырылат — бош орун талап кылганда гана алысыраак турат. */
-  (function order(n) {
-    const ch = kids(n);
-    if (ch === n.children && ch.length > 1) {
-      const star = n.children.find(c => c.star);
-      if (star) {
-        const rest = n.children.filter(c => c !== star).sort((a, b) => a.sw - b.sw);
-        n.children = [star, ...rest];
-      }
-    }
-    kids(n).forEach(order);
-  })(root);
-
-  let cursor = 0;
-  (function assignX(n) {
-    const ch = kids(n);
-    if (!ch.length) { n.x = cursor; cursor += n.w + SIB_GAP; return; }
-    ch.forEach(assignX);
-    cursor += GROUP_GAP;
-    const star = ch.find(c => c.star);
-    if (star) {
-      n.x = star.x + star.w / 2 - n.w / 2;
-    } else {
-      const a = ch[0], b = ch[ch.length - 1];
-      n.x = (a.x + b.x + b.w) / 2 - n.w / 2;
-    }
-  })(root);
-
-  GENS = Math.max(...visible.map(n => n.depth)) + 1;
-  BB = {
-    x0: Math.min(...visible.map(n => n.x)) - 40,
-    x1: Math.max(...visible.map(n => n.x + n.w)) + 40,
-    y0: -40,
-    y1: Math.max(...visible.map(n => n.y + n.h)) + 40
+function computeVisible() {
+  const list = []; const root = byId[ROOT_ID];
+  const walk = (n, depth, vp, ancEdge) => {
+    n._depth = depth; n._vp = vp; n._ancEdge = ancEdge; list.push(n);
+    visChildren(n).forEach(k => walk(k, depth + 1, n, (n.id === ANCESTOR_FROM && k.id === ANCESTOR_TO && !ancExpanded)));
   };
-  CENTER_X = root.x + root.w / 2;
-
-  gRows.innerHTML = ""; gLinks.innerHTML = ""; gNodes.innerHTML = "";
-  linkOf = new Map(); elOf = new Map();
-
-  for (let d = 0; d < GENS; d++) {
-    const y = d * (NODE_H + ROW_GAP) + NODE_H / 2;
-    const line = document.createElementNS(NS, "line");
-    line.setAttribute("x1", BB.x0); line.setAttribute("x2", BB.x1);
-    line.setAttribute("y1", y); line.setAttribute("y2", y);
-    line.setAttribute("class", "genline");
-    gRows.appendChild(line);
-  }
-
-  visible.forEach(n => {
-    const p = effParent(n);
-    if (p) {
-      const bypass = n.id === ANCESTOR_TO && ancestorsCollapsed;
-      const x1 = p.x + p.w / 2, y1 = p.y + p.h;
-      const x2 = n.x + n.w / 2, y2 = n.y - 7;
-      const my = (y1 + y2) / 2;
-      const path = document.createElementNS(NS, "path");
-      path.setAttribute("d", `M${x1} ${y1} C${x1} ${my}, ${x2} ${my}, ${x2} ${y2}`);
-      path.setAttribute("class", "link" + (n.star ? " star" : "") + (bypass ? " bypass" : ""));
-      path.setAttribute("marker-end", "url(#ar)");
-      gLinks.appendChild(path);
-      linkOf.set(n.id, path);
-
-      if (bypass) {
-        const label = document.createElementNS(NS, "text");
-        label.setAttribute("x", (x1 + x2) / 2 + 10);
-        label.setAttribute("y", my);
-        label.setAttribute("class", "bypass-label");
-        label.textContent = `⋯ ${segmentIds.size} муун жашырылды`;
-        gLinks.appendChild(label);
-      }
-    }
-
-    const g = document.createElementNS(NS, "g");
-    g.dataset.id = n.id;
-    g.setAttribute("class",
-      "node" + (n === root ? " root" : "") + (n.id === "n1" ? " trunk" : "") +
-      (n.star ? " star" : "") + (n.kind ? " " + n.kind : ""));
-    g.setAttribute("transform", `translate(${n.x},${n.y})`);
-    g.setAttribute("tabindex", "0");
-    g.setAttribute("role", "button");
-    g.setAttribute("aria-label", n.name);
-
-    const r = document.createElementNS(NS, "rect");
-    r.setAttribute("class", "plate");
-    r.setAttribute("width", n.w);
-    r.setAttribute("height", n.h);
-    g.appendChild(r);
-
-    const t = document.createElementNS(NS, "text");
-    t.setAttribute("class", "name");
-    t.setAttribute("y", n.h / 2 + 1);
-    if (n.kind) {
-      const icon = document.createElementNS(NS, "text");
-      icon.setAttribute("class", "icon");
-      icon.setAttribute("x", 11);
-      icon.setAttribute("y", n.h / 2 + 1);
-      icon.setAttribute("text-anchor", "middle");
-      icon.textContent = n.kind === "tribe" ? "⛺" : "♛";
-      g.appendChild(icon);
-      t.setAttribute("x", 22);
-      t.setAttribute("text-anchor", "start");
-    } else {
-      t.setAttribute("x", n.w / 2);
-      t.setAttribute("text-anchor", "middle");
-    }
-    t.textContent = n.name;
-    g.appendChild(t);
-
-    g.addEventListener("pointerenter", () => hot(n, true));
-    g.addEventListener("pointerleave", () => hot(n, false));
-    g.addEventListener("focus", () => hot(n, true));
-    g.addEventListener("blur", () => hot(n, false));
-    g.addEventListener("click", e => { if (e.target.closest(".toggle")) return; e.stopPropagation(); select(n); });
-    g.addEventListener("keydown", e => { if (e.key === "Enter") select(n); });
-
-    if (n.children.length && !noToggle.has(n.id)) {
-      const isClosed = collapsed.has(n.id);
-      const tg = document.createElementNS(NS, "g");
-      tg.setAttribute("class", "toggle" + (isClosed ? " closed" : " open"));
-      tg.setAttribute("transform", `translate(${n.w / 2},${n.h + 9})`);
-      const tc = document.createElementNS(NS, "circle");
-      tc.setAttribute("r", 8);
-      tg.appendChild(tc);
-      const tt = document.createElementNS(NS, "text");
-      tt.setAttribute("text-anchor", "middle");
-      tt.setAttribute("y", 3.5);
-      tt.textContent = isClosed ? "+" : "–";
-      tg.appendChild(tt);
-      const title = document.createElementNS(NS, "title");
-      title.textContent = (isClosed ? "Ачуу" : "Жашыруу") + ` (${descendants(n)} урпак)`;
-      tg.appendChild(title);
-      /* Чыныгы басуу төмөндөгү #stage pointerup четтетүүсү аркылуу гана
-         иштейт (pointer capture "click" окуясын түйүнгө жеткирбейт),
-         ошондуктан бул жерде өзүнчө click угузгуч кошулбайт —
-         кош которулуудан сактоо үчүн */
-      g.appendChild(tg);
-    }
-
-    gNodes.appendChild(g);
-    elOf.set(n.id, g);
-  });
-
-  gensBox.innerHTML = ""; genEls = [];
-  for (let d = 0; d < GENS; d++) {
-    const el = document.createElement("span");
-    el.textContent = `${d + 1}-муун`;
-    gensBox.appendChild(el);
-    genEls.push(el);
-  }
-
-  applyBranchFilter();
-  apply();
+  walk(root, 0, null, false);
+  return list;
 }
 
-/* ── Ата-тек жолун жарык кылуу ───────────────────────────── */
-function hot(n, on) {
-  chain(n).forEach(a => {
-    const el = elOf.get(a.id);
-    if (el) el.classList.toggle("hot", on);
-    const l = linkOf.get(a.id);
-    if (l) { l.classList.toggle("hot", on); l.setAttribute("marker-end", on ? "url(#arh)" : "url(#ar)"); }
+/* ── Жайгаштыруу ─────────────────────────────────────────── */
+function tileW(n) {
+  const f = n.id === ROOT_ID ? '700 18px "PT Serif"'
+    : n.star ? '700 13.5px "PT Sans"'
+    : n.kind === "tribe" ? 'italic 13.5px "PT Sans"' : '400 13.5px "PT Sans"';
+  mctx.font = f;
+  const w = mctx.measureText(n.name).width;
+  let pad = n.id === ROOT_ID ? 52 : 24;
+  if (n.kind) pad += 24; // icon + gap
+  return Math.max(58, Math.min(220, Math.round(w + pad)));
+}
+
+function layout() {
+  visible = computeVisible();
+  visible.forEach(n => { n._w = tileW(n); n._h = n.id === ROOT_ID ? 44 : 34; });
+  // Spine (unbroken red-line chain from root) pinned to a fixed left column.
+  // Every other node hugs just right of the spine, packed per-row; an expanded
+  // branch reserves its own rows' width, so it only pushes right when opened.
+  const isSpine = n => { let p = n; while (p) { if (!p.star) return false; p = p.parent ? byId[p.parent] : null; } return true; };
+  const maxHalf = Math.max(...visible.map(n => n._w)) / 2;
+  const spineCenter = maxHalf + 40;
+  spineCenterX = spineCenter;
+  const gap = 16; const rowCursor = {};
+  const place = n => {
+    const d = n._depth;
+    const parentCx = n._vp ? n._vp._cx : spineCenter;
+    const leftEdge = rowCursor[d] != null ? rowCursor[d] : (spineCenter + maxHalf + gap);
+    n._cx = isSpine(n) ? spineCenter : Math.max(leftEdge + n._w / 2, parentCx);
+    rowCursor[d] = n._cx + n._w / 2 + gap;
+    visChildren(n).forEach(place);
+  };
+  place(byId[ROOT_ID]);
+  let minX = 1e9, maxX = -1e9, maxD = 0;
+  visible.forEach(n => { n._y = n._depth * rowH + topPad;
+    minX = Math.min(minX, n._cx - n._w / 2); maxX = Math.max(maxX, n._cx + n._w / 2); maxD = Math.max(maxD, n._depth); });
+  bbox = { minX, maxX, minY: topPad, maxY: maxD * rowH + topPad + 44, maxD };
+  worldW = maxX + 80;
+}
+
+function ico(kind) {
+  if (kind === "leader") return '<svg class="ni k" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M5 18 L12 5 L19 18 Z"/><path d="M5 18 L19 18"/><path d="M12 5 L12 18"/></svg>';
+  if (kind === "tribe") return '<svg class="ni t" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M4 19 L4 12 Q12 3 20 12 L20 19"/><path d="M4 19 L20 19"/><path d="M12 6 L12 19"/></svg>';
+  return "";
+}
+
+function buildNodes() {
+  const host = el_nodes; host.innerHTML = ""; nodeEls = {};
+  visible.forEach(n => {
+    const el = document.createElement("div");
+    let cls = "node";
+    if (n.id === ROOT_ID) cls += " root";
+    if (n.star) cls += " star";
+    if (n.kind === "leader") cls += " leader";
+    if (n.kind === "tribe") cls += " tribe";
+    const kids = childMap[n.id].length > 0 && n.id !== ROOT_ID;
+    const isExp = expanded.has(n.id);
+    if (kids && !isExp) cls += " collapsed";
+    el.className = cls;
+    el.style.left = (n._cx - n._w / 2) + "px";
+    el.style.top = n._y + "px";
+    el.style.width = n._w + "px";
+    el.dataset.id = n.id;
+    el.innerHTML = ico(n.kind) + '<span class="nm">' + n.name + "</span>";
+    if (kids) {
+      const t = document.createElement("div");
+      t.className = "tgl " + (isExp ? "minus" : "plus");
+      t.dataset.tgl = n.id;
+      t.innerHTML = isExp ? '<span class="pc">－</span>' : '<span class="pc">＋</span> ' + n._sub;
+      el.appendChild(t);
+    }
+    host.appendChild(el);
+    nodeEls[n.id] = el;
   });
+  // content-fit pass: never clip a name (covers root + compound names)
+  visible.forEach(n => {
+    const el = nodeEls[n.id]; const nm = el.querySelector(".nm"); if (!nm) return;
+    const need = nm.scrollWidth + (el.clientWidth - nm.clientWidth) + 2;
+    if (need > el.clientWidth) { n._w = Math.ceil(need + (n.id === ROOT_ID ? 36 : 24) - 24); el.style.width = n._w + "px"; el.style.left = (n._cx - n._w / 2) + "px"; }
+  });
+}
+
+function buildGens() {
+  const host = el_gens; host.innerHTML = "";
+  const byDepth = {};
+  visible.forEach(n => { (byDepth[n._depth] = byDepth[n._depth] || []).push(n); });
+  genEls = [];
+  Object.keys(byDepth).forEach(d => {
+    const y = (+d) * rowH + topPad - 14;
+    const g = Math.min(...byDepth[d].map(n => n.gen));
+    const line = document.createElement("div");
+    line.className = "genline"; line.style.top = y + "px"; line.style.width = worldW + "px";
+    host.appendChild(line);
+    const lab = document.createElement("div");
+    lab.className = "genlab"; lab.style.top = y + "px"; lab.style.left = (bbox.minX - 14) + "px";
+    lab.style.transform = "translate(-100%,-50%)";
+    lab.textContent = g + "-муун";
+    host.appendChild(lab); genEls.push(lab);
+  });
+}
+
+function drawLinks() {
+  const svg = el_svg;
+  svg.setAttribute("width", worldW);
+  svg.setAttribute("height", bbox.maxY + 40);
+  let s = "";
+  el_knot.innerHTML = "";
+  visible.forEach(n => {
+    const p = n._vp; if (!p) return;
+    const x1 = p._cx, y1 = p._y + p._h, x2 = n._cx, y2 = n._y;
+    const my = (y1 + y2) / 2;
+    const d = `M${x1} ${y1} C ${x1} ${my} ${x2} ${my} ${x2} ${y2}`;
+    const bothStar = p.star && n.star;
+    const active = chain.has(n.id) && chain.has(p.id);
+    if (n._ancEdge) {
+      s += `<path d="${d}" fill="none" stroke="#C7A344" stroke-width="2" stroke-dasharray="3 7" stroke-linecap="round" opacity="0.85"/>`;
+      const k = document.createElement("div"); k.className = "knot";
+      k.style.left = x2 + "px"; k.style.top = my + "px"; k.dataset.action = "anc";
+      k.innerHTML = '<div class="dia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div><div class="kl">⋯ ' + segmentIds.length + ' муун жашырылды</div>';
+      el_knot.appendChild(k);
+    } else if (active) {
+      s += `<path d="${d}" fill="none" stroke="#E0C56E" stroke-width="3.4" stroke-linecap="round"/>`;
+    } else if (bothStar) {
+      s += `<path d="${d}" fill="none" stroke="#C7A344" stroke-width="3.4" stroke-linecap="round"/>`;
+      s += `<path d="${d}" fill="none" stroke="#B4392E" stroke-width="1.2" stroke-linecap="round" opacity="0.85"/>`;
+    } else {
+      const dim = (filter !== "all" && n._branch && n._branch !== filter);
+      s += `<path d="${d}" fill="none" stroke="#C7A344" stroke-width="1.4" stroke-linecap="round" opacity="${dim ? 0.14 : 0.5}"/>`;
+    }
+  });
+  svg.innerHTML = s;
+}
+
+function updateClasses() {
+  visible.forEach(n => {
+    const el = nodeEls[n.id]; if (!el) return;
+    el.classList.toggle("selected", selected === n.id);
+    el.classList.toggle("active", chain.has(n.id));
+    el.classList.toggle("match", matches.has(n.id));
+    const dim = (filter !== "all" && n._branch && n._branch !== filter);
+    el.classList.toggle("dim", dim);
+  });
+}
+
+function rebuild() { layout(); buildNodes(); buildGens(); drawLinks(); updateClasses(); applyCam(); }
+function refresh() { drawLinks(); updateClasses(); }
+
+/* ── Камера ──────────────────────────────────────────────── */
+function applyCam() {
+  const { s, tx, ty } = cam;
+  el_world.style.transform = `translate(${tx}px,${ty}px) scale(${s})`;
+  if (genEls) { const op = s < 0.32 ? 0 : Math.min(1, (s - 0.32) / 0.3); genEls.forEach(e => e.style.opacity = op); }
+}
+function vp() { return el_viewport.getBoundingClientRect(); }
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+function home() {
+  const r = vp();
+  const stars = visible.filter(n => n.star);
+  const yT = Math.min(...stars.map(n => n._y));
+  const yB = Math.max(...stars.map(n => n._y + n._h));
+  const cx = spineCenterX;
+  const s = clamp((r.height - 190) / (yB - yT), 0.2, 1.05);
+  cam.s = s;
+  cam.tx = r.width * 0.34 - cx * s;
+  cam.ty = 118 - yT * s;
+  applyCam();
+}
+function fit() {
+  const r = vp(); const b = bbox;
+  const s = clamp(Math.min((r.width - 90) / (b.maxX - b.minX), (r.height - 180) / (b.maxY - b.minY)), 0.12, 1.1);
+  cam.s = s;
+  cam.tx = (r.width - (b.maxX + b.minX) * s) / 2;
+  cam.ty = Math.max(96, (r.height - (b.maxY + b.minY) * s) / 2);
+  applyCam();
+}
+function zoomAt(f, px, py) {
+  const r = vp(); px = px ?? r.width / 2; py = py ?? r.height / 2;
+  const ns = clamp(cam.s * f, 0.12, 3);
+  const wx = (px - r.left - cam.tx) / cam.s, wy = (py - r.top - cam.ty) / cam.s;
+  cam.s = ns; cam.tx = px - r.left - wx * ns; cam.ty = py - r.top - wy * ns; applyCam();
+}
+function centerOn(n, zoom) {
+  const r = vp(); const s = zoom || Math.max(cam.s, 0.75);
+  cam.s = s; cam.tx = r.width / 2 - n._cx * s; cam.ty = r.height * 0.42 - n._y * s; applyCam();
+}
+
+/* ── Ата-тек чынжыры ─────────────────────────────────────── */
+function ancestry(n) { const a = []; let p = n; while (p) { a.unshift(p); p = p.parent ? byId[p.parent] : null; } return a; }
+function setChain(n) { chain = new Set(ancestry(n).map(x => x.id)); }
+
+function syncAncLabel() {
+  const label = el_anc.querySelector("[data-anclabel]");
+  label.textContent = ancExpanded ? "Ата-бабаларды жашыруу" : `Ата-бабаларды ачуу (${segmentIds.length})`;
+}
+
+function revealTo(n) { // expand every ancestor + ancestor chain if needed
+  const a = ancestry(n);
+  if (a.some(x => segmentIdSet.has(x.id))) ancExpanded = true;
+  a.forEach(x => { if (childMap[x.id].length) expanded.add(x.id); });
+  syncAncLabel();
+}
+
+function toggleNode(id) {
+  if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
+  rebuild();
+  if (selected === id && byId[id]) openPanel(byId[id]);
+}
+function toggleAnc() {
+  ancExpanded = !ancExpanded;
+  syncAncLabel();
+  rebuild();
+}
+function setFilter(b) {
+  filter = b;
+  el_chips.querySelectorAll(".chip").forEach(c => c.classList.toggle("on", c.dataset.branch === b));
+  refresh();
+}
+function search(q) {
+  q = q.trim().toLowerCase();
+  if (!q) { matches = new Set(); el_count.classList.remove("on"); refresh(); return; }
+  const hits = nodes.filter(n => n.name.toLowerCase().includes(q));
+  matches = new Set(hits.map(n => n.id));
+  el_count.textContent = hits.length; el_count.classList.add("on");
+  if (hits.length) { revealTo(hits[0]); rebuild(); centerOn(hits[0], Math.max(cam.s, 0.9)); }
+  else refresh();
 }
 
 /* ── Панель ──────────────────────────────────────────────── */
-const panel = document.getElementById("panel");
-let selected = null;
-
-const KIND_LABEL = { tribe: "Уруунун аты", leader: "Уруу башчысы / атактуу инсан" };
-
-function select(n) {
-  if (selected) { const prevEl = elOf.get(selected.id); if (prevEl) prevEl.classList.remove("sel"); }
-  selected = n;
-  const el = elOf.get(n.id); if (el) el.classList.add("sel");
-
-  document.getElementById("pgen").textContent = `${n.depth + 1}-муун`;
-  document.getElementById("pkin").innerHTML = `<li>${n.name}</li>` +
-    (n.kind ? `<li class="tag">${KIND_LABEL[n.kind]}</li>` : "");
-
-  const descEl = document.getElementById("pdesc");
-  if (n.desc) { descEl.textContent = n.desc; descEl.style.display = ""; }
-  else { descEl.style.display = "none"; }
-
-  const sibs = n.parent ? byId.get(n.parent).children.filter(c => c !== n) : [];
-  document.getElementById("psibs-blk").style.display = sibs.length ? "" : "none";
-  document.getElementById("psibs").innerHTML = sibs.map(s => `<li data-go="${s.id}">${s.name}</li>`).join("");
-
-  const path = chain(n);
-  document.getElementById("ppath").innerHTML = path
-    .map(a => `<li data-go="${a.id}">${a.name}</li>`).join("");
-  document.querySelectorAll("#ppath li, #psibs li").forEach(li =>
-    li.onclick = () => revealAndGoto(byId.get(li.dataset.go)));
-
-  document.getElementById("pkids").textContent = n.children.length;
-  document.getElementById("pall").textContent = descendants(n);
-
-  const expandBtn = document.getElementById("pexpand");
-  if (n.children.length && collapsed.has(n.id)) {
-    expandBtn.style.display = "";
-    expandBtn.textContent = `Бутакты ачуу (${descendants(n)})`;
-    expandBtn.onclick = () => { collapsed.delete(n.id); render(); select(n); };
-  } else {
-    expandBtn.style.display = "none";
+function openPanel(n) {
+  selected = n.id; setChain(n); updateClasses(); refresh();
+  const gen = n.gen;
+  const kindTag = n.kind === "tribe" ? '<span class="ptag">' + ico("tribe") + "Уруунун аты</span>"
+    : n.kind === "leader" ? '<span class="ptag">' + ico("leader") + "Уруу башчысы / атактуу инсан</span>" : "";
+  const desc = n.desc ? '<p class="pdesc">' + n.desc + "</p>" : "";
+  const collapsed = childMap[n.id].length > 0 && !expanded.has(n.id) && n.id !== ROOT_ID;
+  const expandBtn = collapsed ? '<button class="pexpand" data-expand="' + n.id + '"><span>＋</span> Бутакты ачуу (' + n._sub + ")</button>" : "";
+  let sibs = "";
+  if (n.parent) {
+    const list = childMap[n.parent].filter(x => x.id !== n.id);
+    if (list.length) sibs = '<div class="psec"><h4>Бир туугандары</h4><ul class="slist">' +
+      list.map(x => '<li><a data-jump="' + x.id + '">' + x.name + "</a></li>").join("") + "</ul></div>";
   }
-
-  panel.classList.add("open");
+  const anc = ancestry(n);
+  const ancHtml = '<div class="psec"><h4>Ата-теги</h4><ul class="anc">' +
+    anc.map((x, i) => '<li class="' + (x.id === n.id ? "cur" : "") + '"><span class="g">' + (i === 0 ? "•" : "↳") + '</span><a data-jump="' + x.id + '">' + x.name + "</a></li>").join("") + "</ul></div>";
+  const stats = '<div class="psec"><h4>Сандар</h4><div class="stats">' +
+    '<div class="stat"><div class="n">' + n._kids + '</div><div class="l">уул тукуму</div></div>' +
+    '<div class="stat"><div class="n">' + n._sub + '</div><div class="l">бардык урпагы</div></div></div></div>';
+  el_pbody.innerHTML =
+    '<div class="eyebrow">' + gen + "-муун</div>" +
+    '<h2 class="pname">' + n.name + "</h2>" + kindTag + desc + expandBtn + sibs + ancHtml + stats;
+  el_panel.classList.add("on");
+  if (window.matchMedia("(max-width:760px)").matches) el_scrim.classList.add("on");
+  el_pbody.scrollTop = 0;
 }
-document.getElementById("pclose").onclick = () => {
-  panel.classList.remove("open");
-  if (selected) { const el = elOf.get(selected.id); if (el) el.classList.remove("sel"); }
-  selected = null;
-};
-
-/* Жашырылган бутактагы/чынжырдагы түйүнгө өтүү: керек болсо ачат */
-function revealAndGoto(n) {
-  let dirty = false;
-  for (let a = realParent(n); a; a = realParent(a)) {
-    if (collapsed.delete(a.id)) dirty = true;
-  }
-  if (ancestorsCollapsed && chain(n).some(a => segmentIds.has(a.id))) {
-    ancestorsCollapsed = false; dirty = true; syncAnctoggle();
-  }
-  if (dirty) render();
-  select(n);
-  center(n);
+function closePanel() {
+  el_panel.classList.remove("on"); el_scrim.classList.remove("on");
+  selected = null; chain = new Set(); updateClasses(); refresh();
 }
+function jump(id) { const n = byId[id]; revealTo(n); rebuild(); openPanel(n); centerOn(n, Math.max(cam.s, 0.85)); }
 
-/* ── Ата-баба чынжырын ачуу/жашыруу баскычы ─────────────────── */
-const anctoggle = document.getElementById("anctoggle");
-function syncAnctoggle() {
-  anctoggle.classList.toggle("on", !ancestorsCollapsed);
-  anctoggle.textContent = ancestorsCollapsed
-    ? `Ата-бабаларды ачуу (${segmentIds.size})`
-    : "Ата-бабаларды жашыруу";
-}
-anctoggle.addEventListener("click", () => {
-  ancestorsCollapsed = !ancestorsCollapsed;
-  syncAnctoggle();
-  render();
-});
-syncAnctoggle();
-
-/* ── Жылдыруу жана масштаб ───────────────────────────────── */
-const stage = document.getElementById("stage");
-let k = 1, tx = 0, ty = 0;
-
-function apply() {
-  vp.setAttribute("transform", `translate(${tx},${ty}) scale(${k})`);
-  const roomy = (NODE_H + ROW_GAP) * k > 24;
-  genEls.forEach((el, d) => {
-    const y = ty + (d * (NODE_H + ROW_GAP) + NODE_H / 2) * k;
-    el.style.transform = `translateY(${y}px)`;
-    el.style.opacity = (roomy && y > topPad() - 10 && y < innerHeight - 8) ? 1 : 0;
+/* ── Окуялар ─────────────────────────────────────────────── */
+function wire() {
+  el_header.addEventListener("click", e => {
+    const b = e.target.closest("[data-branch]"); if (b) { setFilter(b.dataset.branch); return; }
+    const a = e.target.closest("[data-action]"); if (!a) return;
+    const act = a.dataset.action;
+    if (act === "zin") zoomAt(1.3); else if (act === "zout") zoomAt(1 / 1.3);
+    else if (act === "home") home(); else if (act === "fit") fit(); else if (act === "anc") toggleAnc();
   });
-}
-function topPad() { return innerWidth <= 760 ? 128 : 96; }
+  el_search.addEventListener("input", e => search(e.target.value));
 
-function home() {
-  const H = BB.y1 - BB.y0;
-  k = Math.min(1, Math.max(0.42, (innerHeight - topPad() - 24) / H));
-  tx = innerWidth / 2 - CENTER_X * k;
-  ty = topPad() - BB.y0 * k;
-  apply();
-}
-function fit() {
-  const W = BB.x1 - BB.x0, H = BB.y1 - BB.y0;
-  k = Math.min(innerWidth / W, (innerHeight - topPad() - 20) / H) * 0.96;
-  tx = (innerWidth - W * k) / 2 - BB.x0 * k;
-  ty = topPad() - BB.y0 * k;
-  apply();
-}
-function center(n) {
-  k = Math.max(k, 0.8);
-  tx = innerWidth / 2 - (n.x + n.w / 2) * k;
-  ty = innerHeight / 2 - (n.y + n.h / 2) * k;
-  apply();
-}
-function zoomAt(cx, cy, f) {
-  const nk = Math.min(3, Math.max(0.08, k * f));
-  tx = cx - (cx - tx) * (nk / k);
-  ty = cy - (cy - ty) * (nk / k);
-  k = nk; apply();
-}
+  let dragging = false;
+  el_nodes.addEventListener("mouseover", e => { const nd = e.target.closest(".node"); if (nd && !dragging) { setChain(byId[nd.dataset.id]); refresh(); } });
+  el_nodes.addEventListener("mouseout", e => { const nd = e.target.closest(".node"); if (nd && !selected) { chain = new Set(); refresh(); } });
 
-stage.addEventListener("wheel", e => {
-  e.preventDefault();
-  zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0016));
-}, { passive: false });
+  el_panel.addEventListener("click", e => {
+    if (e.target.closest('[data-action="close"]')) return closePanel();
+    const j = e.target.closest("[data-jump]"); if (j) return jump(j.dataset.jump);
+    const ex = e.target.closest("[data-expand]"); if (ex) { expanded.add(ex.dataset.expand); rebuild(); openPanel(byId[ex.dataset.expand]); }
+  });
+  el_scrim.addEventListener("click", () => closePanel());
 
-const pts = new Map();
-let last = null, pinch = null, moved = false;
-stage.addEventListener("pointerdown", e => {
-  pts.set(e.pointerId, e);
-  stage.setPointerCapture(e.pointerId);
-  moved = false;
-  if (pts.size === 1) { last = { x: e.clientX, y: e.clientY }; stage.classList.add("dragging"); }
-  if (pts.size === 2) pinch = dist();
-});
-stage.addEventListener("pointermove", e => {
-  if (!pts.has(e.pointerId)) return;
-  pts.set(e.pointerId, e);
-  if (pts.size === 2 && pinch) {
-    const d = dist(), c = mid();
-    zoomAt(c.x, c.y, d / pinch); pinch = d; moved = true; return;
-  }
-  if (pts.size === 1 && last) {
-    const dx = e.clientX - last.x, dy = e.clientY - last.y;
-    if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
-    tx += dx; ty += dy;
-    last = { x: e.clientX, y: e.clientY }; apply();
-  }
-});
-const up = e => {
-  pts.delete(e.pointerId);
-  if (pts.size < 2) pinch = null;
-  if (!pts.size) {
-    last = null; stage.classList.remove("dragging");
-    if (!moved) {
-      const t = document.elementFromPoint(e.clientX, e.clientY);
-      const tgHit = t && t.closest ? t.closest(".toggle") : null;
-      if (tgHit) {
-        const g = tgHit.closest(".node");
-        if (g) toggleCollapse(g.dataset.id);
-      } else {
-        const g = t && t.closest ? t.closest(".node") : null;
-        if (g) select(byId.get(g.dataset.id));
+  // Panning captures the pointer on the whole canvas for reliable drag-tracking, which
+  // retargets the browser's native click away from any node/toggle/knot underneath —
+  // so taps are resolved geometrically at pointerup instead of via a click listener.
+  const viewport = el_viewport; const pts = new Map(); let last = null, pd0 = 0, ps0 = 1;
+  viewport.addEventListener("pointerdown", e => {
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); viewport.setPointerCapture(e.pointerId);
+    if (pts.size === 1) { last = { x: e.clientX, y: e.clientY }; dragging = false; viewport.classList.add("grabbing"); }
+    else if (pts.size === 2) { const p = [...pts.values()]; pd0 = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y); ps0 = cam.s; }
+  });
+  viewport.addEventListener("pointermove", e => { if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2) { const p = [...pts.values()]; const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+      const cx = (p[0].x + p[1].x) / 2, cy = (p[0].y + p[1].y) / 2; const f = (ps0 * d / pd0) / cam.s; zoomAt(f, cx, cy); return; }
+    if (last) { const dx = e.clientX - last.x, dy = e.clientY - last.y; if (Math.abs(dx) + Math.abs(dy) > 3) dragging = true;
+      cam.tx += dx; cam.ty += dy; last = { x: e.clientX, y: e.clientY }; applyCam(); }
+  });
+  const up = e => {
+    pts.delete(e.pointerId); if (pts.size < 2) pd0 = 0;
+    if (pts.size === 0) {
+      last = null; viewport.classList.remove("grabbing");
+      if (!dragging) {
+        const t = document.elementFromPoint(e.clientX, e.clientY);
+        const tgl = t && t.closest ? t.closest(".tgl") : null;
+        const knot = t && t.closest ? t.closest(".knot") : null;
+        const nd = t && t.closest ? t.closest(".node") : null;
+        if (tgl) toggleNode(tgl.dataset.tgl);
+        else if (knot) toggleAnc();
+        else if (nd) openPanel(byId[nd.dataset.id]);
       }
+      setTimeout(() => dragging = false, 30);
     }
-  }
-};
-stage.addEventListener("pointerup", up);
-stage.addEventListener("pointercancel", up);
-function two() { return [...pts.values()]; }
-function dist() { const [a, b] = two(); return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
-function mid() { const [a, b] = two(); return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 }; }
-
-document.getElementById("zin").onclick = () => zoomAt(innerWidth / 2, innerHeight / 2, 1.3);
-document.getElementById("zout").onclick = () => zoomAt(innerWidth / 2, innerHeight / 2, 1 / 1.3);
-document.getElementById("zfit").onclick = fit;
-document.getElementById("zhome").onclick = home;
-let touched = false;
-["wheel", "pointerdown"].forEach(ev => stage.addEventListener(ev, () => { touched = true; }));
-addEventListener("resize", () => { if (!touched) home(); else apply(); });
-
-/* ── Издөө ───────────────────────────────────────────────── */
-const q = document.getElementById("q"), qc = document.getElementById("qcount");
-q.addEventListener("input", () => {
-  const v = q.value.trim().toLowerCase();
-  let hits = [];
-  byId.forEach(n => {
-    const el = elOf.get(n.id);
-    const m = v && n.name.toLowerCase().includes(v);
-    if (el) el.classList.toggle("hit", !!m);
-    if (m) hits.push(n);
-  });
-  qc.textContent = v ? (hits.length || "0") : "";
-  if (hits.length) revealAndGoto(hits[0]);
-});
-
-/* ── Бутак чыпкасы ───────────────────────────────────────── */
-let branchFilter = "all";
-function applyBranchFilter() {
-  byId.forEach(n => {
-    /* n.branch == null — жалпы ата-баба (ортоктош багыт), эч качан
-       көмүскөлөнбөйт; бутакка таандык болгондо гана дал келбесе өчөт */
-    const off = branchFilter !== "all" && n.branch != null && n.branch !== branchFilter;
-    const el = elOf.get(n.id); if (el) el.classList.toggle("dim", off);
-    const l = linkOf.get(n.id); if (l) l.classList.toggle("dim", off);
-  });
-}
-document.querySelectorAll(".chip[data-branch]").forEach(btn => {
-  btn.onclick = () => {
-    document.querySelectorAll(".chip[data-branch]").forEach(b => b.classList.toggle("on", b === btn));
-    branchFilter = btn.dataset.branch;
-    applyBranchFilter();
   };
-});
+  viewport.addEventListener("pointerup", up); viewport.addEventListener("pointercancel", up);
+  viewport.addEventListener("wheel", e => { e.preventDefault(); zoomAt(e.deltaY < 0 ? 1.12 : 1 / 1.12, e.clientX, e.clientY); }, { passive: false });
+}
 
-render();
-home();
+/* ── Ишке киргизүү ───────────────────────────────────────── */
+function init() {
+  buildData();
+  expanded = new Set(nodes.filter(n => n.star).map(n => n.id));
+  ancExpanded = false;
+  filter = "all";
+  selected = null;
+  matches = new Set();
+  chain = new Set();
+  cam = { s: 1, tx: 0, ty: 0 };
+  captureEls();
+  syncAncLabel();
+  wire();
+  const go = () => { rebuild(); home(); };
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(go); else go();
+  window.addEventListener("resize", () => applyCam());
+}
+init();

@@ -6,85 +6,74 @@
 <title>Ногой санжырасы</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=PT+Serif:ital,wght@0,400;0,700;1,400;1,700&family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
-<div id="stage">
-  <svg id="tree" aria-label="Ногой санжырасынын дарагы"></svg>
-</div>
-
-<div id="gens" aria-hidden="true"></div>
-
-<header>
-  <div class="brand">
-    <svg class="horns" viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" aria-hidden="true">
-      <path d="M60 100 C60 62 26 64 26 40 C26 22 50 22 50 40 C50 52 36 52 36 42"/>
-      <path d="M60 100 C60 62 94 64 94 40 C94 22 70 22 70 40 C70 52 84 52 84 42"/>
-      <path d="M60 100 L60 112"/>
+<div class="app" id="app">
+  <div class="viewport" id="viewport">
+    <div class="world" id="world">
+      <svg class="links" id="links"></svg>
+      <div class="gens" id="gens"></div>
+      <div class="knotlayer" id="knotlayer"></div>
+      <div class="nodes" id="nodes"></div>
+    </div>
+    <svg class="flourish l" viewBox="0 0 190 150" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M14 148 C14 96 46 96 46 118 C46 132 30 132 30 120 M60 148 C60 70 108 70 108 106 C108 128 82 128 82 110 C82 98 96 98 96 106 M120 148 C120 44 186 44 186 96"/>
     </svg>
-    <div>
-      <h1>Ногой санжырасы</h1>
-      <p class="sub">Эркек тукум боюнча ата-теги</p>
+    <svg class="flourish r" viewBox="0 0 190 150" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M14 148 C14 96 46 96 46 118 C46 132 30 132 30 120 M60 148 C60 70 108 70 108 106 C108 128 82 128 82 110 C82 98 96 98 96 106 M120 148 C120 44 186 44 186 96"/>
+    </svg>
+    <div class="legend">
+      <div><b>Кутуча</b> — бир адам · <b class="lg">Кызыл</b> — түз ата-тек · <b class="lg">◈</b> — уруу башчысы · <b class="lg">⌂</b> — уруунун аты</div>
+      <div>Түйүндүн астындагы <b class="lg">＋ / －</b> — бутакты ачуу/жашыруу · сүйрөп жылдырыңыз · дөңгөлөк менен чоңойтуңуз · басып тааныңыз</div>
     </div>
   </div>
 
-  <div class="spacer"></div>
+  <header class="bar" id="bar">
+    <div class="brand">
+      <svg class="horn" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round">
+        <path d="M20 40 C20 20 6 20 6 30 C6 38 16 38 16 30 C16 25 11 25 11 29"/>
+        <path d="M28 40 C28 20 42 20 42 30 C42 38 32 38 32 30 C32 25 37 25 37 29"/>
+        <path d="M24 40 L24 10 M24 10 C21 13 21 17 24 19 C27 17 27 13 24 10"/>
+      </svg>
+      <div>
+        <div class="bt">НОГОЙ САНЖЫРАСЫ</div>
+        <div class="bs">Эркек тукум боюнча ата-теги</div>
+      </div>
+    </div>
+    <div class="spring"></div>
+    <div class="searchwrap">
+      <svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20 L16 16"/></svg>
+      <input class="search" id="search" type="text" placeholder="Ат боюнча издөө" aria-label="Ат боюнча издөө">
+      <span class="mcount" id="mcount"></span>
+    </div>
+    <div class="chips" id="chips">
+      <button class="chip on" data-branch="all">Баары</button>
+      <button class="chip" data-branch="karach">Карач</button>
+      <button class="chip" data-branch="manas">Манас</button>
+    </div>
+    <button class="ancbtn" id="ancbtn" data-action="anc">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4 L12 20 M12 4 L7 9 M12 4 L17 9"/></svg>
+      <span data-anclabel>Ата-бабаларды ачуу</span>
+    </button>
+    <div class="zoom">
+      <button class="zbtn" data-action="zin" aria-label="Чоңойтуу"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></button>
+      <button class="zbtn" data-action="zout" aria-label="Кичирейтүү"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
+      <button class="zbtn" data-action="home" aria-label="Башкы көрүнүш"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M4 12 L12 4 L20 12"/><path d="M6 11 L6 20 L18 20 L18 11"/></svg></button>
+      <button class="zbtn" data-action="fit" aria-label="Бүт дарак"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    </div>
+  </header>
 
-  <div class="search">
-    <input id="q" type="search" placeholder="Ат боюнча издөө" autocomplete="off" aria-label="Ат боюнча издөө">
-    <span class="count" id="qcount"></span>
-  </div>
-
-  <div class="chips">
-    <button class="chip on" data-branch="all">Баары</button>
-    <button class="chip" data-branch="karach">Карач</button>
-    <button class="chip" data-branch="manas">Манас</button>
-  </div>
-
-  <button id="anctoggle" class="chip anc-btn" title="Долон бийден Ногойго чейинки ата-бабалар чынжырын ачуу/жашыруу"></button>
-
-  <div class="zoom">
-    <button id="zin"  title="Чоңойтуу" aria-label="Чоңойтуу">＋</button>
-    <button id="zout" title="Кичирейтүү" aria-label="Кичирейтүү">－</button>
-    <button id="zhome" title="Башкы көрүнүш" aria-label="Башкы көрүнүш">⌂</button>
-    <button id="zfit" title="Толук көрүнүш" aria-label="Толук көрүнүш">⤢</button>
-  </div>
-</header>
-
-<aside id="panel" aria-live="polite">
-  <button class="close" id="pclose" aria-label="Жабуу">×</button>
-  <p class="gen" id="pgen"></p>
-  <ul class="kin" id="pkin"></ul>
-  <p class="desc" id="pdesc"></p>
-  <button class="expand-btn" id="pexpand"></button>
-  <div id="psibs-blk">
-    <p class="blk-title">Бир туугандары</p>
-    <ul class="path" id="psibs"></ul>
-  </div>
-  <p class="blk-title">Ата-теги</p>
-  <ul class="path" id="ppath"></ul>
-  <p class="blk-title">Сандар</p>
-  <div class="stats">
-    <div class="stat"><b id="pkids">0</b><span>уул тукуму</span></div>
-    <div class="stat"><b id="pall">0</b><span>бардык урпагы</span></div>
-  </div>
-</aside>
-
-<p class="legend">
-  <b>Кутуча</b> — бир адам &nbsp;·&nbsp; <b>Кызыл</b> — түз ата-тек &nbsp;·&nbsp; <b>♛</b> — уруу башчысы &nbsp;·&nbsp; <b>⛺</b> — уруунун аты<br>
-  Түйүндүн астындагы <b>+ / –</b> — бутакты ачуу/жашыруу · Сүйрөп жылдырыңыз · дөңгөлөк менен чоңойтуңуз · басып тааныңыз
-</p>
-
-<svg class="corner bl" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true">
-  <path d="M8 92 C8 50 40 56 40 30 C40 12 62 14 62 30 C62 42 48 42 48 32"/>
-  <path d="M8 92 L92 92 M8 92 L8 8"/>
-</svg>
-<svg class="corner br" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true">
-  <path d="M8 92 C8 50 40 56 40 30 C40 12 62 14 62 30 C62 42 48 42 48 32"/>
-  <path d="M8 92 L92 92 M8 92 L8 8"/>
-</svg>
+  <div class="scrim" id="scrim" data-action="close"></div>
+  <aside class="panel" id="panel">
+    <div class="grip"></div>
+    <div class="pclose" id="pclose" data-action="close" role="button" aria-label="Жабуу">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6 L18 18 M18 6 L6 18"/></svg>
+    </div>
+    <div class="pscroll" id="pbody"></div>
+  </aside>
+</div>
 
 <script src="data.js"></script>
 <script src="app.js"></script>
