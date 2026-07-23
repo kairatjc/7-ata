@@ -86,8 +86,6 @@ body{background:var(--navy);font-family:"PT Sans",system-ui,sans-serif;color:var
 .node.active.star{box-shadow:0 0 0 2px rgba(224,197,110,.55),-3px 0 0 var(--red),0 3px 10px rgba(0,0,0,.4)}
 .node.match{background:linear-gradient(180deg,#f7e58a,#ecc94b);border-color:var(--gold-d);color:#3a2c07}
 .node.match::before{border-color:rgba(120,90,20,.4)}
-.node.dim{opacity:.28;filter:saturate(.4)}
-.node.dim:hover{opacity:.85}
 
 /* ancestor-chain knot */
 .knotlayer{position:absolute;top:0;left:0;pointer-events:none}
@@ -120,12 +118,6 @@ body{background:var(--navy);font-family:"PT Sans",system-ui,sans-serif;color:var
 .mcount{position:absolute;right:12px;font:700 12px/1 "PT Sans";color:var(--gold-l);
   font-feature-settings:"tnum";opacity:0;transition:opacity .15s}
 .mcount.on{opacity:1}
-.chips{display:inline-flex;border:1px solid rgba(199,163,68,.4);border-radius:19px;overflow:hidden;background:rgba(20,31,44,.7)}
-.chip{appearance:none;border:none;background:transparent;color:var(--sage);cursor:pointer;
-  font:700 13px/1 "PT Sans";padding:10px 15px;letter-spacing:.03em;transition:.15s}
-.chip+.chip{border-left:1px solid rgba(199,163,68,.25)}
-.chip:hover{color:var(--cream)}
-.chip.on{background:linear-gradient(180deg,var(--red-l),var(--red-d));color:var(--cream)}
 .ancbtn{appearance:none;cursor:pointer;font:700 13px/1 "PT Sans";letter-spacing:.02em;
   padding:0 15px;height:38px;border-radius:19px;color:var(--gold-l);white-space:nowrap;
   background:rgba(20,31,44,.7);border:1px dashed var(--gold);display:inline-flex;align-items:center;gap:7px}
@@ -196,8 +188,6 @@ body{background:var(--navy);font-family:"PT Sans",system-ui,sans-serif;color:var
   .spring{display:none}
   .searchwrap{order:5;flex:1 1 100%}
   .search{width:100%}
-  .chips{order:6;flex:1 1 auto}
-  .chip{flex:1;text-align:center;padding:11px 6px}
   .ancbtn{order:7;flex:1 1 auto;justify-content:center}
   .zoom{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));flex-direction:column;z-index:25}
   .zbtn{width:44px;height:44px}

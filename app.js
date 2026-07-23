@@ -5,16 +5,15 @@ const ANCESTOR_FROM = "dolon", ANCESTOR_TO = "n1";
 let nodes, byId, childMap, segmentIds, segmentIdSet;
 
 function buildData() {
-  nodes = SANJYRA.map(n => ({ ...n, star: !!n.star, kind: n.kind || null, branch: n.branch || null, desc: n.desc || null }));
+  nodes = SANJYRA.map(n => ({ ...n, star: !!n.star, kind: n.kind || null, desc: n.desc || null }));
   byId = {}; childMap = {};
   nodes.forEach(n => { byId[n.id] = n; childMap[n.id] = []; });
   nodes.forEach(n => { if (n.parent) childMap[n.parent].push(n); });
   // star child first within each parent
   Object.values(childMap).forEach(a => a.sort((x, y) => (y.star ? 1 : 0) - (x.star ? 1 : 0)));
-  // gen number (1-based), branch inheritance
+  // gen number (1-based)
   nodes.forEach(n => {
     let g = 1, p = n; while (p.parent) { g++; p = byId[p.parent]; } n.gen = g;
-    let b = null, q = n; while (q) { if (q.branch) { b = q.branch; break; } q = q.parent ? byId[q.parent] : null; } n._branch = b;
   });
   const sub = id => { let c = 0; for (const k of childMap[id]) c += 1 + sub(k.id); return c; };
   nodes.forEach(n => { n._sub = sub(n.id); n._kids = childMap[n.id].length; });
@@ -27,13 +26,13 @@ function buildData() {
 }
 
 /* ── Абалы ────────────────────────────────────────────────── */
-let expanded, ancExpanded, filter, selected, matches, chain, cam, nodeEls;
+let expanded, ancExpanded, selected, matches, chain, cam, nodeEls;
 let visible, bbox, worldW, genEls, spineCenterX;
 const rowH = 92, topPad = 118;
 const mctx = document.createElement("canvas").getContext("2d");
 
 let el_app, el_viewport, el_world, el_svg, el_gens, el_nodes, el_knot,
-  el_header, el_search, el_count, el_chips, el_anc, el_panel, el_pbody, el_scrim;
+  el_header, el_search, el_count, el_anc, el_panel, el_pbody, el_scrim;
 
 function captureEls() {
   el_app = document.getElementById("app");
@@ -46,7 +45,6 @@ function captureEls() {
   el_header = document.getElementById("bar");
   el_search = document.getElementById("search");
   el_count = document.getElementById("mcount");
-  el_chips = document.getElementById("chips");
   el_anc = document.getElementById("ancbtn");
   el_panel = document.getElementById("panel");
   el_pbody = document.getElementById("pbody");
@@ -195,8 +193,7 @@ function drawLinks() {
       s += `<path d="${d}" fill="none" stroke="#C7A344" stroke-width="3.4" stroke-linecap="round"/>`;
       s += `<path d="${d}" fill="none" stroke="#B4392E" stroke-width="1.2" stroke-linecap="round" opacity="0.85"/>`;
     } else {
-      const dim = (filter !== "all" && n._branch && n._branch !== filter);
-      s += `<path d="${d}" fill="none" stroke="#C7A344" stroke-width="1.4" stroke-linecap="round" opacity="${dim ? 0.14 : 0.5}"/>`;
+      s += `<path d="${d}" fill="none" stroke="#C7A344" stroke-width="1.4" stroke-linecap="round" opacity="0.5"/>`;
     }
   });
   svg.innerHTML = s;
@@ -208,8 +205,6 @@ function updateClasses() {
     el.classList.toggle("selected", selected === n.id);
     el.classList.toggle("active", chain.has(n.id));
     el.classList.toggle("match", matches.has(n.id));
-    const dim = (filter !== "all" && n._branch && n._branch !== filter);
-    el.classList.toggle("dim", dim);
   });
 }
 
@@ -282,11 +277,6 @@ function toggleAnc() {
   syncAncLabel();
   rebuild();
 }
-function setFilter(b) {
-  filter = b;
-  el_chips.querySelectorAll(".chip").forEach(c => c.classList.toggle("on", c.dataset.branch === b));
-  refresh();
-}
 function search(q) {
   q = q.trim().toLowerCase();
   if (!q) { matches = new Set(); el_count.classList.remove("on"); refresh(); return; }
@@ -334,7 +324,6 @@ function jump(id) { const n = byId[id]; revealTo(n); rebuild(); openPanel(n); ce
 /* ── Окуялар ─────────────────────────────────────────────── */
 function wire() {
   el_header.addEventListener("click", e => {
-    const b = e.target.closest("[data-branch]"); if (b) { setFilter(b.dataset.branch); return; }
     const a = e.target.closest("[data-action]"); if (!a) return;
     const act = a.dataset.action;
     if (act === "zin") zoomAt(1.3); else if (act === "zout") zoomAt(1 / 1.3);
@@ -393,7 +382,6 @@ function init() {
   buildData();
   expanded = new Set(nodes.filter(n => n.star).map(n => n.id));
   ancExpanded = false;
-  filter = "all";
   selected = null;
   matches = new Set();
   chain = new Set();
