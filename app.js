@@ -54,6 +54,10 @@ function captureEls() {
 
 /* ── Тил / i18n ──────────────────────────────────────────── */
 function t() { return I18N[lang] || I18N[DEFAULT_LANG]; }
+function getName(n) {
+  if (lang === "en" && NAME_EN[n.name]) return NAME_EN[n.name];
+  return n.name;
+}
 function getDesc(n) {
   if (lang !== DEFAULT_LANG && I18N_DESC[lang] && I18N_DESC[lang][n.id]) return I18N_DESC[lang][n.id];
   return n.desc;
@@ -99,7 +103,7 @@ function tileW(n) {
     : n.star ? '700 13.5px "PT Sans"'
     : n.kind === "tribe" ? 'italic 13.5px "PT Sans"' : '400 13.5px "PT Sans"';
   mctx.font = f;
-  const w = mctx.measureText(n.name).width;
+  const w = mctx.measureText(getName(n)).width;
   let pad = n.id === ROOT_ID ? 52 : 24;
   if (n.kind) pad += 24; // icon + gap
   return Math.max(58, Math.min(220, Math.round(w + pad)));
@@ -155,7 +159,7 @@ function buildNodes() {
     el.style.top = n._y + "px";
     el.style.width = n._w + "px";
     el.dataset.id = n.id;
-    el.innerHTML = ico(n.kind) + '<span class="nm">' + n.name + "</span>";
+    el.innerHTML = ico(n.kind) + '<span class="nm">' + getName(n) + "</span>";
     if (kids) {
       const t = document.createElement("div");
       t.className = "tgl " + (isExp ? "minus" : "plus");
@@ -305,7 +309,7 @@ function toggleAnc() {
 function search(q) {
   q = q.trim().toLowerCase();
   if (!q) { matches = new Set(); el_count.classList.remove("on"); refresh(); return; }
-  const hits = nodes.filter(n => n.name.toLowerCase().includes(q));
+  const hits = nodes.filter(n => n.name.toLowerCase().includes(q) || getName(n).toLowerCase().includes(q));
   matches = new Set(hits.map(n => n.id));
   el_count.textContent = hits.length; el_count.classList.add("on");
   if (hits.length) { revealTo(hits[0]); rebuild(); centerOn(hits[0], Math.max(cam.s, 0.9)); }
@@ -327,17 +331,17 @@ function openPanel(n) {
   if (n.parent) {
     const list = childMap[n.parent].filter(x => x.id !== n.id);
     if (list.length) sibs = '<div class="psec"><h4>' + T.siblings + '</h4><ul class="slist">' +
-      list.map(x => '<li><a data-jump="' + x.id + '">' + x.name + "</a></li>").join("") + "</ul></div>";
+      list.map(x => '<li><a data-jump="' + x.id + '">' + getName(x) + "</a></li>").join("") + "</ul></div>";
   }
   const anc = ancestry(n);
   const ancHtml = '<div class="psec"><h4>' + T.ancestry + '</h4><ul class="anc">' +
-    anc.map((x, i) => '<li class="' + (x.id === n.id ? "cur" : "") + '"><span class="g">' + (i === 0 ? "•" : "↳") + '</span><a data-jump="' + x.id + '">' + x.name + "</a></li>").join("") + "</ul></div>";
+    anc.map((x, i) => '<li class="' + (x.id === n.id ? "cur" : "") + '"><span class="g">' + (i === 0 ? "•" : "↳") + '</span><a data-jump="' + x.id + '">' + getName(x) + "</a></li>").join("") + "</ul></div>";
   const stats = '<div class="psec"><h4>' + T.stats + '</h4><div class="stats">' +
     '<div class="stat"><div class="n">' + n._kids + '</div><div class="l">' + T.sonsCount + '</div></div>' +
     '<div class="stat"><div class="n">' + n._sub + '</div><div class="l">' + T.allDescendants + '</div></div></div></div>';
   el_pbody.innerHTML =
     '<div class="eyebrow">' + T.genLabel(gen) + "</div>" +
-    '<h2 class="pname">' + n.name + "</h2>" + kindTag + desc + expandBtn + sibs + ancHtml + stats;
+    '<h2 class="pname">' + getName(n) + "</h2>" + kindTag + desc + expandBtn + sibs + ancHtml + stats;
   el_panel.classList.add("on");
   if (window.matchMedia("(max-width:760px)").matches) el_scrim.classList.add("on");
   el_pbody.scrollTop = 0;
