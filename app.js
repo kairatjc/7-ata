@@ -26,13 +26,13 @@ function buildData() {
 }
 
 /* ── Абалы ────────────────────────────────────────────────── */
-let expanded, ancExpanded, selected, matches, chain, cam, nodeEls;
+let expanded, ancExpanded, selected, matches, chain, cam, nodeEls, lang;
 let visible, bbox, worldW, genEls, spineCenterX;
 const rowH = 92, topPad = 118;
 const mctx = document.createElement("canvas").getContext("2d");
 
 let el_app, el_viewport, el_world, el_svg, el_gens, el_nodes, el_knot,
-  el_header, el_search, el_count, el_anc, el_panel, el_pbody, el_scrim;
+  el_header, el_search, el_count, el_anc, el_panel, el_pbody, el_scrim, el_lang;
 
 function captureEls() {
   el_app = document.getElementById("app");
@@ -49,6 +49,31 @@ function captureEls() {
   el_panel = document.getElementById("panel");
   el_pbody = document.getElementById("pbody");
   el_scrim = document.getElementById("scrim");
+  el_lang = document.getElementById("langSelect");
+}
+
+/* ── Тил / i18n ──────────────────────────────────────────── */
+function t() { return I18N[lang] || I18N[DEFAULT_LANG]; }
+function getDesc(n) {
+  if (lang !== DEFAULT_LANG && I18N_DESC[lang] && I18N_DESC[lang][n.id]) return I18N_DESC[lang][n.id];
+  return n.desc;
+}
+function applyI18n() {
+  const T = t();
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = T[el.dataset.i18n]; });
+  document.querySelectorAll("[data-i18n-html]").forEach(el => { el.innerHTML = T[el.dataset.i18nHtml]; });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(el => { el.placeholder = T[el.dataset.i18nPlaceholder]; });
+  document.querySelectorAll("[data-i18n-aria]").forEach(el => { el.setAttribute("aria-label", T[el.dataset.i18nAria]); });
+  syncAncLabel();
+}
+function setLang(l) {
+  if (!I18N[l]) l = DEFAULT_LANG;
+  lang = l;
+  localStorage.setItem("lang", lang);
+  el_lang.value = lang;
+  applyI18n();
+  if (genEls) { rebuild(); if (selected && byId[selected]) openPanel(byId[selected]); }
 }
 
 /* ── Көрүнгөн бутактар ───────────────────────────────────── */
@@ -163,7 +188,7 @@ function buildGens() {
     const lab = document.createElement("div");
     lab.className = "genlab"; lab.style.top = y + "px"; lab.style.left = (bbox.minX - 14) + "px";
     lab.style.transform = "translate(-100%,-50%)";
-    lab.textContent = g + "-муун";
+    lab.textContent = t().genLabel(g);
     host.appendChild(lab); genEls.push(lab);
   });
 }
@@ -185,7 +210,7 @@ function drawLinks() {
       s += `<path d="${d}" fill="none" stroke="#C7A344" stroke-width="2" stroke-dasharray="3 7" stroke-linecap="round" opacity="0.85"/>`;
       const k = document.createElement("div"); k.className = "knot";
       k.style.left = x2 + "px"; k.style.top = my + "px"; k.dataset.action = "anc";
-      k.innerHTML = '<div class="dia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div><div class="kl">⋯ ' + segmentIds.length + ' муун жашырылды</div>';
+      k.innerHTML = '<div class="dia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div><div class="kl">' + t().hiddenGens(segmentIds.length) + '</div>';
       el_knot.appendChild(k);
     } else if (active) {
       s += `<path d="${d}" fill="none" stroke="#E0C56E" stroke-width="3.4" stroke-linecap="round"/>`;
@@ -257,7 +282,7 @@ function setChain(n) { chain = new Set(ancestry(n).map(x => x.id)); }
 
 function syncAncLabel() {
   const label = el_anc.querySelector("[data-anclabel]");
-  label.textContent = ancExpanded ? "Ата-бабаларды жашыруу" : `Ата-бабаларды ачуу (${segmentIds.length})`;
+  label.textContent = ancExpanded ? t().ancClose : t().ancOpen(segmentIds.length);
 }
 
 function revealTo(n) { // expand every ancestor + ancestor chain if needed
@@ -290,26 +315,28 @@ function search(q) {
 /* ── Панель ──────────────────────────────────────────────── */
 function openPanel(n) {
   selected = n.id; setChain(n); updateClasses(); refresh();
+  const T = t();
   const gen = n.gen;
-  const kindTag = n.kind === "tribe" ? '<span class="ptag">' + ico("tribe") + "Уруунун аты</span>"
-    : n.kind === "leader" ? '<span class="ptag">' + ico("leader") + "Уруу башчысы / атактуу инсан</span>" : "";
-  const desc = n.desc ? '<p class="pdesc">' + n.desc + "</p>" : "";
+  const kindTag = n.kind === "tribe" ? '<span class="ptag">' + ico("tribe") + T.tribeTag + "</span>"
+    : n.kind === "leader" ? '<span class="ptag">' + ico("leader") + T.leaderTag + "</span>" : "";
+  const descText = getDesc(n);
+  const desc = descText ? '<p class="pdesc">' + descText + "</p>" : "";
   const collapsed = childMap[n.id].length > 0 && !expanded.has(n.id) && n.id !== ROOT_ID;
-  const expandBtn = collapsed ? '<button class="pexpand" data-expand="' + n.id + '"><span>＋</span> Бутакты ачуу (' + n._sub + ")</button>" : "";
+  const expandBtn = collapsed ? '<button class="pexpand" data-expand="' + n.id + '"><span>＋</span> ' + T.expandBranch(n._sub) + "</button>" : "";
   let sibs = "";
   if (n.parent) {
     const list = childMap[n.parent].filter(x => x.id !== n.id);
-    if (list.length) sibs = '<div class="psec"><h4>Бир туугандары</h4><ul class="slist">' +
+    if (list.length) sibs = '<div class="psec"><h4>' + T.siblings + '</h4><ul class="slist">' +
       list.map(x => '<li><a data-jump="' + x.id + '">' + x.name + "</a></li>").join("") + "</ul></div>";
   }
   const anc = ancestry(n);
-  const ancHtml = '<div class="psec"><h4>Ата-теги</h4><ul class="anc">' +
+  const ancHtml = '<div class="psec"><h4>' + T.ancestry + '</h4><ul class="anc">' +
     anc.map((x, i) => '<li class="' + (x.id === n.id ? "cur" : "") + '"><span class="g">' + (i === 0 ? "•" : "↳") + '</span><a data-jump="' + x.id + '">' + x.name + "</a></li>").join("") + "</ul></div>";
-  const stats = '<div class="psec"><h4>Сандар</h4><div class="stats">' +
-    '<div class="stat"><div class="n">' + n._kids + '</div><div class="l">уул тукуму</div></div>' +
-    '<div class="stat"><div class="n">' + n._sub + '</div><div class="l">бардык урпагы</div></div></div></div>';
+  const stats = '<div class="psec"><h4>' + T.stats + '</h4><div class="stats">' +
+    '<div class="stat"><div class="n">' + n._kids + '</div><div class="l">' + T.sonsCount + '</div></div>' +
+    '<div class="stat"><div class="n">' + n._sub + '</div><div class="l">' + T.allDescendants + '</div></div></div></div>';
   el_pbody.innerHTML =
-    '<div class="eyebrow">' + gen + "-муун</div>" +
+    '<div class="eyebrow">' + T.genLabel(gen) + "</div>" +
     '<h2 class="pname">' + n.name + "</h2>" + kindTag + desc + expandBtn + sibs + ancHtml + stats;
   el_panel.classList.add("on");
   if (window.matchMedia("(max-width:760px)").matches) el_scrim.classList.add("on");
@@ -330,6 +357,7 @@ function wire() {
     else if (act === "home") home(); else if (act === "fit") fit(); else if (act === "anc") toggleAnc();
   });
   el_search.addEventListener("input", e => search(e.target.value));
+  el_lang.addEventListener("change", e => setLang(e.target.value));
 
   let dragging = false;
   el_nodes.addEventListener("mouseover", e => { const nd = e.target.closest(".node"); if (nd && !dragging) { setChain(byId[nd.dataset.id]); refresh(); } });
@@ -387,7 +415,9 @@ function init() {
   chain = new Set();
   cam = { s: 1, tx: 0, ty: 0 };
   captureEls();
-  syncAncLabel();
+  lang = I18N[localStorage.getItem("lang")] ? localStorage.getItem("lang") : DEFAULT_LANG;
+  el_lang.value = lang;
+  applyI18n();
   wire();
   const go = () => { rebuild(); home(); };
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(go); else go();
