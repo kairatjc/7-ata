@@ -18,7 +18,6 @@
 
 - 🌳 **Auto-laid-out family tree** — 235 people across multiple generations, drawn as a clean SVG diagram with the direct ancestral line ("түз ата-тек") centered and highlighted.
 - 🔍 **Instant search** — find any name as you type, with a live match count.
-- 🎯 **Branch filtering** — jump between the *Карач* and *Манас* branches, or view everyone at once.
 - 🧭 **Pan & zoom** — drag to move, scroll to zoom, plus fit-to-screen and reset controls.
 - 👤 **Person detail panel** — tap anyone to see their ancestral path, siblings, number of sons, and total descendants.
 - 📱 **Fully responsive & touch-friendly** — works on desktop and mobile.
@@ -84,7 +83,6 @@ To add or edit a person, change a single array in [`data.js`](data.js):
 - `parent` — the father's `id` (`null` for the root)
 - `name` — the person's name
 - `star` — `true` to mark the direct ancestral line
-- `branch` — optional branch label used by the filter chips
 
 Commit, merge to `main`, and the change is live automatically.
 
