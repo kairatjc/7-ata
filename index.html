@@ -25,8 +25,8 @@
       <path d="M14 148 C14 96 46 96 46 118 C46 132 30 132 30 120 M60 148 C60 70 108 70 108 106 C108 128 82 128 82 110 C82 98 96 98 96 106 M120 148 C120 44 186 44 186 96"/>
     </svg>
     <div class="legend">
-      <div><b>Кутуча</b> — бир адам · <b class="lg">Кызыл</b> — түз ата-тек · <b class="lg">◈</b> — уруу башчысы · <b class="lg">⌂</b> — уруунун аты</div>
-      <div>Түйүндүн астындагы <b class="lg">＋ / －</b> — бутакты ачуу/жашыруу · сүйрөп жылдырыңыз · дөңгөлөк менен чоңойтуңуз · басып тааныңыз</div>
+      <div data-i18n-html="legend1"><b>Кутуча</b> — бир адам · <b class="lg">Кызыл</b> — түз ата-тек · <b class="lg">◈</b> — уруу башчысы · <b class="lg">⌂</b> — уруунун аты</div>
+      <div data-i18n-html="legend2">Түйүндүн астындагы <b class="lg">＋ / －</b> — бутакты ачуу/жашыруу · сүйрөп жылдырыңыз · дөңгөлөк менен чоңойтуңуз · басып тааныңыз</div>
     </div>
   </div>
 
@@ -39,31 +39,39 @@
       </svg>
       <div>
         <div class="bt">НОГОЙ САНЖЫРАСЫ</div>
-        <div class="bs">Эркек тукум боюнча ата-теги</div>
+        <div class="bs" data-i18n="brandSubtitle">Эркек тукум боюнча ата-теги</div>
       </div>
     </div>
     <div class="spring"></div>
     <div class="searchwrap">
       <svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20 L16 16"/></svg>
-      <input class="search" id="search" type="text" placeholder="Ат боюнча издөө" aria-label="Ат боюнча издөө">
+      <input class="search" id="search" type="text" placeholder="Ат боюнча издөө" aria-label="Ат боюнча издөө" data-i18n-placeholder="searchPlaceholder" data-i18n-aria="searchPlaceholder">
       <span class="mcount" id="mcount"></span>
     </div>
     <button class="ancbtn" id="ancbtn" data-action="anc">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4 L12 20 M12 4 L7 9 M12 4 L17 9"/></svg>
       <span data-anclabel>Ата-бабаларды ачуу</span>
     </button>
+    <div class="langsel-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.7 2.6 4 5.7 4 9s-1.3 6.4-4 9c-2.7-2.6-4-5.7-4-9s1.3-6.4 4-9z"/></svg>
+      <select class="langsel" id="langSelect" data-i18n-aria="langLabel" aria-label="Тил тандоо">
+        <option value="ky">Кыргызча</option>
+        <option value="ru">Русский</option>
+        <option value="en">English</option>
+      </select>
+    </div>
     <div class="zoom">
-      <button class="zbtn" data-action="zin" aria-label="Чоңойтуу"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></button>
-      <button class="zbtn" data-action="zout" aria-label="Кичирейтүү"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
-      <button class="zbtn" data-action="home" aria-label="Башкы көрүнүш"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M4 12 L12 4 L20 12"/><path d="M6 11 L6 20 L18 20 L18 11"/></svg></button>
-      <button class="zbtn" data-action="fit" aria-label="Бүт дарак"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+      <button class="zbtn" data-action="zin" aria-label="Чоңойтуу" data-i18n-aria="zoomIn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></button>
+      <button class="zbtn" data-action="zout" aria-label="Кичирейтүү" data-i18n-aria="zoomOut"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
+      <button class="zbtn" data-action="home" aria-label="Башкы көрүнүш" data-i18n-aria="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M4 12 L12 4 L20 12"/><path d="M6 11 L6 20 L18 20 L18 11"/></svg></button>
+      <button class="zbtn" data-action="fit" aria-label="Бүт дарак" data-i18n-aria="fit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
     </div>
   </header>
 
   <div class="scrim" id="scrim" data-action="close"></div>
   <aside class="panel" id="panel">
     <div class="grip"></div>
-    <div class="pclose" id="pclose" data-action="close" role="button" aria-label="Жабуу">
+    <div class="pclose" id="pclose" data-action="close" role="button" aria-label="Жабуу" data-i18n-aria="close">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6 L18 18 M18 6 L6 18"/></svg>
     </div>
     <div class="pscroll" id="pbody"></div>
@@ -71,6 +79,7 @@
 </div>
 
 <script src="data.js"></script>
+<script src="i18n.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
